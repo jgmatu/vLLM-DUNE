@@ -46,6 +46,12 @@ Este script:
 - crea `/etc/containers/nodocker`,
 - prueba GPU en contenedor con `docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04`.
 
+Nota tecnica (RHEL10):
+
+- En esta PoC se usa imagen base Ubuntu para maximizar compatibilidad del stack IA en contenedor.
+- Aun asi, el host RHEL10 sigue siendo la capa recomendada de operacion/seguridad.
+- RHEL10 tambien permite trabajar con su ecosistema de contenedores enterprise (por ejemplo UBI con Podman) para instancias paralelas y servicios de apoyo cuando la arquitectura lo requiera.
+
 ### 2) Descargar modelo en `models/`
 
 Dependencia minima:
