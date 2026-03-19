@@ -80,6 +80,7 @@ int main() {
     std::cin >> n;
     
     bucle(n);
+}
 ```
 
 # TEST: vLLM agent outputs (src/test_agent.py)
