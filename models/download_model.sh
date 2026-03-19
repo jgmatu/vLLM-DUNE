@@ -24,6 +24,14 @@ if [[ -z "$MODEL_ID" ]]; then
   exit 1
 fi
 
+# Common mistake: passing a local path as repo_id, e.g. models/Qwen2.5-7B-Instruct.
+# Auto-normalize to likely HF repo for this project defaults.
+if [[ "$MODEL_ID" == models/* ]]; then
+  REPO_NAME_FROM_PATH="${MODEL_ID#models/}"
+  MODEL_ID="Qwen/${REPO_NAME_FROM_PATH}"
+  echo "WARN: MODEL_ID looked like a local path. Normalized to '$MODEL_ID'."
+fi
+
 if [[ -z "$DEST_DIR" ]]; then
   REPO_NAME="${MODEL_ID##*/}"
   DEST_DIR="models/${REPO_NAME}"
@@ -54,9 +62,7 @@ snapshot_download(
     repo_id=model_id,
     revision=revision,
     local_dir=dest_dir,
-    local_dir_use_symlinks=False,
     token=hf_token,
-    resume_download=True,
 )
 print("Download completed.")
 PY

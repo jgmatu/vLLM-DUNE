@@ -9,7 +9,12 @@ import urllib.request
 def main() -> int:
     base_url = os.getenv("VLLM_BASE_URL", "http://localhost:8000")
     model = os.getenv("VLLM_MODEL", "Qwen2.5-7B-Instruct")
-    prompt = " ".join(sys.argv[1:]).strip() or "Di hola en una linea."
+    stream = False
+    args = sys.argv[1:]
+    if "--stream" in args:
+        stream = True
+        args = [a for a in args if a != "--stream"]
+    prompt = " ".join(args).strip() or "Di hola en una linea."
 
     payload = {
         "model": model,
@@ -19,6 +24,7 @@ def main() -> int:
         ],
         "temperature": 0.2,
         "max_tokens": 128,
+        "stream": stream,
     }
 
     url = f"{base_url.rstrip('/')}/v1/chat/completions"
@@ -31,6 +37,24 @@ def main() -> int:
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
+            if stream:
+                print("=== Stream (anon) ===")
+                for raw in resp:
+                    line = raw.decode("utf-8", errors="replace").strip()
+                    if not line.startswith("data: "):
+                        continue
+                    data_part = line[6:]
+                    if data_part == "[DONE]":
+                        break
+                    try:
+                        evt = json.loads(data_part)
+                        delta = evt.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        if delta:
+                            print(delta, end="", flush=True)
+                    except Exception:
+                        continue
+                print()
+                return 0
             body = resp.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         err = exc.read().decode("utf-8", errors="replace")

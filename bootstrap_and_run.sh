@@ -58,4 +58,4 @@ bash run_vllm_docker_local.sh "$MODEL_DIR"
 echo
 echo "Done. Quick checks:"
 echo "  curl http://localhost:8000/v1/models"
-echo "  docker logs -f vllm-dune"
+echo "  $CONTAINER_CLI logs -f vllm-dune"

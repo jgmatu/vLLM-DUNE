@@ -44,3 +44,7 @@
 models/*
 !models/note.txt
 !models/download_model.sh
+
+# Runtime logs
+logs/*
+!logs/.gitkeep

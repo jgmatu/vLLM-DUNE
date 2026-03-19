@@ -14,6 +14,7 @@ MODEL_NAME="${MODEL_NAME:-Qwen2.5-7B-Instruct}"
 VLLM_PORT="${VLLM_PORT:-8000}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.90}"
+LOG_DIR="${LOG_DIR:-logs}"
 
 if [[ -z "$MODEL_DIR" ]]; then
   echo "ERROR: local model directory is required."
@@ -47,10 +48,14 @@ if podman container exists "$CONTAINER_NAME"; then
   podman rm -f "$CONTAINER_NAME" >/dev/null
 fi
 
+# Extra safety for race/stale state: do not fail if absent.
+podman rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+
 ABS_MODEL_DIR="$(realpath "$MODEL_DIR")"
 
 echo "Starting vLLM container '$CONTAINER_NAME' on port $VLLM_PORT ..."
 podman run -d \
+  --replace \
   --name "$CONTAINER_NAME" \
   --hooks-dir=/usr/share/containers/oci/hooks.d \
   --security-opt=label=disable \
@@ -65,8 +70,17 @@ podman run -d \
   --max-model-len "$MAX_MODEL_LEN" \
   --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION"
 
+mkdir -p "$LOG_DIR"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="${LOG_DIR}/${CONTAINER_NAME}-${TIMESTAMP}.log"
+podman logs -f "$CONTAINER_NAME" >"$LOG_FILE" 2>&1 &
+LOG_PID=$!
+echo "$LOG_PID" > "${LOG_DIR}/${CONTAINER_NAME}.log.pid"
+
 echo "vLLM is starting. Check logs with:"
 echo "  podman logs -f $CONTAINER_NAME"
+echo "Container log file:"
+echo "  $LOG_FILE (collector pid: $LOG_PID)"
 echo
 echo "API test:"
 echo "  curl http://localhost:${VLLM_PORT}/v1/models"

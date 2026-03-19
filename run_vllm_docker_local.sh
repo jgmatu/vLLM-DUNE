@@ -16,6 +16,7 @@ MODEL_NAME="${MODEL_NAME:-Qwen2.5-7B-Instruct}"
 VLLM_PORT="${VLLM_PORT:-8000}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.90}"
+LOG_DIR="${LOG_DIR:-logs}"
 
 if [[ -z "$MODEL_DIR" ]]; then
   echo "ERROR: local model directory is required."
@@ -44,9 +45,10 @@ if ! "$CONTAINER_CLI" image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
   "$CONTAINER_CLI" build -t "$IMAGE_NAME" -f docker-images/Dockerfile.vllm-nvidia-rhel10 .
 fi
 
-if "$CONTAINER_CLI" ps -a --format '{{.Names}}' | rg -x "$CONTAINER_NAME" >/dev/null 2>&1; then
+# Remove same-name container if present (safe no-op if missing).
+if "$CONTAINER_CLI" container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
   echo "Removing previous container '$CONTAINER_NAME' ..."
-  "$CONTAINER_CLI" rm -f "$CONTAINER_NAME" >/dev/null
+  "$CONTAINER_CLI" rm -f "$CONTAINER_NAME" >/dev/null || true
 fi
 
 ABS_MODEL_DIR="$(realpath "$MODEL_DIR")"
@@ -68,6 +70,7 @@ RUN_ARGS=(
 if [[ "$CONTAINER_CLI" == "podman" ]]; then
   RUN_ARGS=(
     run -d
+    --replace
     --name "$CONTAINER_NAME"
     --hooks-dir=/usr/share/containers/oci/hooks.d
     --security-opt=label=disable
@@ -102,8 +105,17 @@ fi
 echo "Starting vLLM container '$CONTAINER_NAME' on port $VLLM_PORT ..."
 "$CONTAINER_CLI" "${RUN_ARGS[@]}"
 
+mkdir -p "$LOG_DIR"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="${LOG_DIR}/${CONTAINER_NAME}-${TIMESTAMP}.log"
+"$CONTAINER_CLI" logs -f "$CONTAINER_NAME" >"$LOG_FILE" 2>&1 &
+LOG_PID=$!
+echo "$LOG_PID" > "${LOG_DIR}/${CONTAINER_NAME}.log.pid"
+
 echo "vLLM is starting. Check logs with:"
 echo "  $CONTAINER_CLI logs -f $CONTAINER_NAME"
+echo "Container log file:"
+echo "  $LOG_FILE (collector pid: $LOG_PID)"
 echo
 echo "API test:"
 echo "  curl http://localhost:${VLLM_PORT}/v1/models"
