@@ -17,6 +17,7 @@ VLLM_PORT="${VLLM_PORT:-8000}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.90}"
 LOG_DIR="${LOG_DIR:-logs}"
+CLI_BACKEND="docker"
 
 if [[ -z "$MODEL_DIR" ]]; then
   echo "ERROR: local model directory is required."
@@ -29,10 +30,42 @@ if [[ ! -d "$MODEL_DIR" ]]; then
   exit 1
 fi
 
+MODEL_SUBDIR=""
+if [[ -f "$MODEL_DIR/config.json" || -f "$MODEL_DIR/params.json" ]]; then
+  MODEL_SUBDIR="."
+else
+  for d in "$MODEL_DIR"/*; do
+    [[ -d "$d" ]] || continue
+    if [[ -f "$d/config.json" || -f "$d/params.json" ]]; then
+      MODEL_SUBDIR="$(basename "$d")"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$MODEL_SUBDIR" ]]; then
+  echo "ERROR: no valid model config found in '$MODEL_DIR'."
+  echo "Expected one of:"
+  echo "  $MODEL_DIR/config.json"
+  echo "  $MODEL_DIR/params.json"
+  echo "or inside one direct subfolder."
+  echo "The directory appears empty or incomplete."
+  exit 1
+fi
+
 if ! command -v "$CONTAINER_CLI" >/dev/null 2>&1; then
   echo "ERROR: container CLI not found: $CONTAINER_CLI"
   echo "Set CONTAINER_CLI=docker or CONTAINER_CLI=podman."
   exit 1
+fi
+
+# If user runs "docker" but it is Podman emulation, use Podman GPU flags.
+if [[ "$CONTAINER_CLI" == "docker" ]]; then
+  VERSION_OUT="$("$CONTAINER_CLI" --version 2>/dev/null || true)"
+  VERSION_OUT_LC="$(printf '%s' "$VERSION_OUT" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$VERSION_OUT_LC" == *"podman"* ]]; then
+    CLI_BACKEND="podman"
+  fi
 fi
 
 if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
@@ -52,14 +85,20 @@ if "$CONTAINER_CLI" container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
 fi
 
 ABS_MODEL_DIR="$(realpath "$MODEL_DIR")"
+MODEL_PATH_IN_CONTAINER="/models/local-model"
+if [[ "$MODEL_SUBDIR" != "." ]]; then
+  MODEL_PATH_IN_CONTAINER="/models/local-model/$MODEL_SUBDIR"
+fi
 
 RUN_ARGS=(
   run -d
   --name "$CONTAINER_NAME"
+  -e NVIDIA_VISIBLE_DEVICES=all
+  -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
   -p "${VLLM_PORT}:8000"
   -v "${ABS_MODEL_DIR}:/models/local-model:ro"
   "$IMAGE_NAME"
-  --model /models/local-model
+  --model "$MODEL_PATH_IN_CONTAINER"
   --served-model-name "$MODEL_NAME"
   --host 0.0.0.0
   --port 8000
@@ -67,7 +106,15 @@ RUN_ARGS=(
   --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION"
 )
 
-if [[ "$CONTAINER_CLI" == "podman" ]]; then
+if [[ "$CONTAINER_CLI" == "podman" || "$CLI_BACKEND" == "podman" ]]; then
+  GPU_CHECK_ARGS=(
+    run --rm
+    --hooks-dir=/usr/share/containers/oci/hooks.d
+    --security-opt=label=disable
+    --device nvidia.com/gpu=all
+    docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04
+    nvidia-smi
+  )
   RUN_ARGS=(
     run -d
     --replace
@@ -75,10 +122,12 @@ if [[ "$CONTAINER_CLI" == "podman" ]]; then
     --hooks-dir=/usr/share/containers/oci/hooks.d
     --security-opt=label=disable
     --device nvidia.com/gpu=all
+    -e NVIDIA_VISIBLE_DEVICES=all
+    -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
     -p "${VLLM_PORT}:8000"
     -v "${ABS_MODEL_DIR}:/models/local-model:ro"
     "$IMAGE_NAME"
-    --model /models/local-model
+    --model "$MODEL_PATH_IN_CONTAINER"
     --served-model-name "$MODEL_NAME"
     --host 0.0.0.0
     --port 8000
@@ -86,14 +135,22 @@ if [[ "$CONTAINER_CLI" == "podman" ]]; then
     --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION"
   )
 else
+  GPU_CHECK_ARGS=(
+    run --rm
+    --gpus all
+    docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04
+    nvidia-smi
+  )
   RUN_ARGS=(
     run -d
     --name "$CONTAINER_NAME"
     --gpus all
+    -e NVIDIA_VISIBLE_DEVICES=all
+    -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
     -p "${VLLM_PORT}:8000"
     -v "${ABS_MODEL_DIR}:/models/local-model:ro"
     "$IMAGE_NAME"
-    --model /models/local-model
+    --model "$MODEL_PATH_IN_CONTAINER"
     --served-model-name "$MODEL_NAME"
     --host 0.0.0.0
     --port 8000
@@ -102,7 +159,16 @@ else
   )
 fi
 
+echo "Checking GPU visibility inside container runtime ..."
+if ! "$CONTAINER_CLI" "${GPU_CHECK_ARGS[@]}" >/dev/null 2>&1; then
+  echo "ERROR: GPU is not visible inside container runtime."
+  echo "Try forcing Podman backend explicitly:"
+  echo "  CONTAINER_CLI=podman bash run_vllm_docker_local.sh \"$MODEL_DIR\""
+  exit 1
+fi
+
 echo "Starting vLLM container '$CONTAINER_NAME' on port $VLLM_PORT ..."
+echo "Container CLI: $CONTAINER_CLI (backend: $CLI_BACKEND)"
 "$CONTAINER_CLI" "${RUN_ARGS[@]}"
 
 mkdir -p "$LOG_DIR"

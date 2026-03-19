@@ -46,6 +46,7 @@ Ejemplos:
 - `bash models/download_model.sh "Qwen/Qwen2.5-7B-Instruct" "models/qwen2.5-7b" "main"`
 - `HF_TOKEN=hf_xxx bash models/download_model.sh "org/model-privado"`
 - Si por error pasas `models/Qwen2.5-7B-Instruct` como `MODEL_ID`, el script lo corrige a `Qwen/Qwen2.5-7B-Instruct`.
+- Si ves error de `Invalid repository ID or local directory`, revisa que exista `config.json` dentro de la carpeta descargada.
 
 ### 3) Levantar vLLM con el modelo local
 
@@ -68,6 +69,9 @@ Pasos con tu carpeta actual (`models/Qwen2.5-7B-Instruct`):
 Tambien puedes usar script Docker-compatible (Docker o Podman emulando Docker):
 
 `bash run_vllm_docker_local.sh "models/Qwen2.5-7B-Instruct"`
+
+Nota: si `docker` esta emulado por Podman, el script detecta ese caso y aplica flags GPU de Podman automaticamente.
+Antes de arrancar vLLM, el script verifica que `nvidia-smi` funciona dentro de contenedor.
 
 ### 4) Verificar servicio
 

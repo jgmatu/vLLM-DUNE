@@ -27,6 +27,29 @@ if [[ ! -d "$MODEL_DIR" ]]; then
   exit 1
 fi
 
+MODEL_SUBDIR=""
+if [[ -f "$MODEL_DIR/config.json" || -f "$MODEL_DIR/params.json" ]]; then
+  MODEL_SUBDIR="."
+else
+  for d in "$MODEL_DIR"/*; do
+    [[ -d "$d" ]] || continue
+    if [[ -f "$d/config.json" || -f "$d/params.json" ]]; then
+      MODEL_SUBDIR="$(basename "$d")"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$MODEL_SUBDIR" ]]; then
+  echo "ERROR: no valid model config found in '$MODEL_DIR'."
+  echo "Expected one of:"
+  echo "  $MODEL_DIR/config.json"
+  echo "  $MODEL_DIR/params.json"
+  echo "or inside one direct subfolder."
+  echo "The directory appears empty or incomplete."
+  exit 1
+fi
+
 if ! command -v podman >/dev/null 2>&1; then
   echo "ERROR: podman is not installed."
   echo "Run first: sudo bash install_offline.sh"
@@ -52,18 +75,36 @@ fi
 podman rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
 ABS_MODEL_DIR="$(realpath "$MODEL_DIR")"
+MODEL_PATH_IN_CONTAINER="/models/local-model"
+if [[ "$MODEL_SUBDIR" != "." ]]; then
+  MODEL_PATH_IN_CONTAINER="/models/local-model/$MODEL_SUBDIR"
+fi
 
 echo "Starting vLLM container '$CONTAINER_NAME' on port $VLLM_PORT ..."
+echo "Checking GPU visibility inside Podman runtime ..."
+if ! podman run --rm \
+  --hooks-dir=/usr/share/containers/oci/hooks.d \
+  --security-opt=label=disable \
+  --device nvidia.com/gpu=all \
+  docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi >/dev/null 2>&1; then
+  echo "ERROR: GPU is not visible inside Podman containers."
+  echo "Re-run host prep and toolkit setup:"
+  echo "  sudo bash install_offline.sh"
+  exit 1
+fi
+
 podman run -d \
   --replace \
   --name "$CONTAINER_NAME" \
   --hooks-dir=/usr/share/containers/oci/hooks.d \
   --security-opt=label=disable \
   --device nvidia.com/gpu=all \
+  -e NVIDIA_VISIBLE_DEVICES=all \
+  -e NVIDIA_DRIVER_CAPABILITIES=compute,utility \
   -p "${VLLM_PORT}:8000" \
   -v "${ABS_MODEL_DIR}:/models/local-model:ro" \
   "$IMAGE_NAME" \
-  --model /models/local-model \
+  --model "$MODEL_PATH_IN_CONTAINER" \
   --served-model-name "$MODEL_NAME" \
   --host 0.0.0.0 \
   --port 8000 \
