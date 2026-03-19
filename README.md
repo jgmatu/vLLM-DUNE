@@ -34,3 +34,15 @@ Script incluido: `models/download_model.sh`
    - `bash models/download_model.sh "Qwen/Qwen2.5-7B-Instruct"`
    - Opcional destino/revision: `bash models/download_model.sh "Qwen/Qwen2.5-7B-Instruct" "models/qwen2.5-7b" "main"`
    - Si el repo es privado: `HF_TOKEN=hf_xxx bash models/download_model.sh "org/model-privado"`
+
+## Script de bootstrap RHEL10 + Podman + NVIDIA
+
+Ejecuta desde cero:
+
+- `sudo bash install_offline.sh`
+
+Este script:
+- valida `nvidia-smi` en host,
+- instala `nvidia-container-toolkit`,
+- crea `/etc/containers/nodocker`,
+- prueba GPU en contenedor con `docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04`.
