@@ -15,6 +15,12 @@ Si ya esta todo instalado y solo quieres ejecutar el modelo:
 
 `bash run_model_only.sh`
 
+Arranque con reintento automatico (OOM-friendly en 12GB VRAM):
+
+`bash start_retry.sh`
+
+El reintento prueba 3 perfiles: `balanced`, `aggressive` y `safe-eager` (con `--enforce-eager`).
+
 Para limpiar contenedor y artefactos:
 
 `bash cleanup.sh`
@@ -55,10 +61,11 @@ Pasos con tu carpeta actual (`models/Qwen2.5-7B-Instruct`):
 1. Arrancar contenedor:
    - `bash run_vllm_docker_local.sh "models/Qwen2.5-7B-Instruct"`
    - Para forzar nombre de modelo servido: `MODEL_NAME="Qwen2.5-7B-Instruct" bash run_vllm_docker_local.sh "models/Qwen2.5-7B-Instruct"`
+   - Si tienes OOM en 12GB VRAM: `DTYPE=float16 MAX_MODEL_LEN=2048 GPU_MEMORY_UTILIZATION=0.72 CPU_OFFLOAD_GB=4 bash run_vllm_docker_local.sh "models/Qwen2.5-7B-Instruct"`
 
 2. Ver logs de carga del modelo:
    - `docker logs -f vllm-dune`
-   - Al arrancar, tambien se guarda un fichero en `logs/` con timestamp.
+   - Al arrancar, se guarda en un unico fichero: `logs/vllm-dune.log`.
 
 3. Probar endpoint OpenAI-compatible:
    - `curl http://localhost:8000/v1/models`

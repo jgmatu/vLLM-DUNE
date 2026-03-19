@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Start vLLM with retry profiles for 12GB-class GPUs.
+#
+# Usage:
+#   bash start_retry.sh
+#   MODEL_DIR="models/Qwen2.5-7B-Instruct" CONTAINER_CLI=podman bash start_retry.sh
+
+MODEL_DIR="${MODEL_DIR:-models/Qwen2.5-7B-Instruct}"
+CONTAINER_CLI="${CONTAINER_CLI:-podman}"
+HEALTH_URL="${HEALTH_URL:-http://localhost:8000/v1/models}"
+
+if [[ ! -f "run_model_only.sh" ]] || [[ ! -f "cleanup.sh" ]]; then
+  echo "ERROR: run from repository root."
+  exit 1
+fi
+
+run_profile() {
+  local name="$1"
+  local dtype="$2"
+  local max_model_len="$3"
+  local gpu_mem="$4"
+  local cpu_offload="$5"
+  local extra_vllm_args="${6:-}"
+
+  echo
+  echo "=== Trying profile: $name ==="
+  echo "DTYPE=$dtype MAX_MODEL_LEN=$max_model_len GPU_MEMORY_UTILIZATION=$gpu_mem CPU_OFFLOAD_GB=$cpu_offload"
+  if [[ -n "$extra_vllm_args" ]]; then
+    echo "EXTRA_VLLM_ARGS=$extra_vllm_args"
+  fi
+
+  bash cleanup.sh >/dev/null 2>&1 || true
+
+  MODEL_DIR="$MODEL_DIR" \
+  CONTAINER_CLI="$CONTAINER_CLI" \
+  DTYPE="$dtype" \
+  MAX_MODEL_LEN="$max_model_len" \
+  GPU_MEMORY_UTILIZATION="$gpu_mem" \
+  CPU_OFFLOAD_GB="$cpu_offload" \
+  EXTRA_VLLM_ARGS="$extra_vllm_args" \
+  bash run_model_only.sh || return 1
+
+  # wait for startup
+  for _ in {1..25}; do
+    if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
+      echo "OK: API responding at $HEALTH_URL"
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "API did not become ready in time."
+  return 1
+}
+
+# Profile A: balanced
+if run_profile "balanced" "float16" "2048" "0.72" "4" ""; then
+  exit 0
+fi
+
+# Profile B: aggressive memory saving
+if run_profile "aggressive" "float16" "1024" "0.60" "6" ""; then
+  exit 0
+fi
+
+# Profile C: safest startup for fragmented/limited VRAM
+if run_profile "safe-eager" "float16" "1024" "0.50" "8" "--enforce-eager --max-num-batched-tokens 512 --max-num-seqs 8"; then
+  exit 0
+fi
+
+echo
+echo "ERROR: retries exhausted."
+echo "Check latest logs in logs/ and run:"
+echo "  bash gpu_stats_extended.sh"
+exit 1

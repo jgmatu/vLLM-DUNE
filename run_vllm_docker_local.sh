@@ -14,10 +14,19 @@ IMAGE_NAME="${IMAGE_NAME:-vllm-dune:cuda12.4}"
 CONTAINER_NAME="${CONTAINER_NAME:-vllm-dune}"
 MODEL_NAME="${MODEL_NAME:-Qwen2.5-7B-Instruct}"
 VLLM_PORT="${VLLM_PORT:-8000}"
-MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
-GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.90}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-2048}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.72}"
+DTYPE="${DTYPE:-float16}"
+CPU_OFFLOAD_GB="${CPU_OFFLOAD_GB:-4}"
 LOG_DIR="${LOG_DIR:-logs}"
 CLI_BACKEND="docker"
+PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+EXTRA_VLLM_ARGS="${EXTRA_VLLM_ARGS:-}"
+EXTRA_ARGS=()
+if [[ -n "$EXTRA_VLLM_ARGS" ]]; then
+  # Space-separated extra args, e.g. "--enforce-eager --max-num-seqs 8"
+  read -r -a EXTRA_ARGS <<< "$EXTRA_VLLM_ARGS"
+fi
 
 if [[ -z "$MODEL_DIR" ]]; then
   echo "ERROR: local model directory is required."
@@ -95,15 +104,19 @@ RUN_ARGS=(
   --name "$CONTAINER_NAME"
   -e NVIDIA_VISIBLE_DEVICES=all
   -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
+  -e PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF"
   -p "${VLLM_PORT}:8000"
   -v "${ABS_MODEL_DIR}:/models/local-model:ro"
   "$IMAGE_NAME"
   --model "$MODEL_PATH_IN_CONTAINER"
   --served-model-name "$MODEL_NAME"
+  --dtype "$DTYPE"
   --host 0.0.0.0
   --port 8000
   --max-model-len "$MAX_MODEL_LEN"
   --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION"
+  --cpu-offload-gb "$CPU_OFFLOAD_GB"
+  "${EXTRA_ARGS[@]}"
 )
 
 if [[ "$CONTAINER_CLI" == "podman" || "$CLI_BACKEND" == "podman" ]]; then
@@ -124,15 +137,19 @@ if [[ "$CONTAINER_CLI" == "podman" || "$CLI_BACKEND" == "podman" ]]; then
     --device nvidia.com/gpu=all
     -e NVIDIA_VISIBLE_DEVICES=all
     -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    -e PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF"
     -p "${VLLM_PORT}:8000"
     -v "${ABS_MODEL_DIR}:/models/local-model:ro"
     "$IMAGE_NAME"
     --model "$MODEL_PATH_IN_CONTAINER"
     --served-model-name "$MODEL_NAME"
+    --dtype "$DTYPE"
     --host 0.0.0.0
     --port 8000
     --max-model-len "$MAX_MODEL_LEN"
     --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION"
+    --cpu-offload-gb "$CPU_OFFLOAD_GB"
+    "${EXTRA_ARGS[@]}"
   )
 else
   GPU_CHECK_ARGS=(
@@ -147,15 +164,19 @@ else
     --gpus all
     -e NVIDIA_VISIBLE_DEVICES=all
     -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    -e PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF"
     -p "${VLLM_PORT}:8000"
     -v "${ABS_MODEL_DIR}:/models/local-model:ro"
     "$IMAGE_NAME"
     --model "$MODEL_PATH_IN_CONTAINER"
     --served-model-name "$MODEL_NAME"
+    --dtype "$DTYPE"
     --host 0.0.0.0
     --port 8000
     --max-model-len "$MAX_MODEL_LEN"
     --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION"
+    --cpu-offload-gb "$CPU_OFFLOAD_GB"
+    "${EXTRA_ARGS[@]}"
   )
 fi
 
@@ -172,11 +193,20 @@ echo "Container CLI: $CONTAINER_CLI (backend: $CLI_BACKEND)"
 "$CONTAINER_CLI" "${RUN_ARGS[@]}"
 
 mkdir -p "$LOG_DIR"
-TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-LOG_FILE="${LOG_DIR}/${CONTAINER_NAME}-${TIMESTAMP}.log"
+LOG_FILE="${LOG_DIR}/${CONTAINER_NAME}.log"
+PID_FILE="${LOG_DIR}/${CONTAINER_NAME}.log.pid"
+
+if [[ -f "$PID_FILE" ]]; then
+  OLD_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
+  if [[ -n "$OLD_PID" ]] && kill -0 "$OLD_PID" >/dev/null 2>&1; then
+    kill "$OLD_PID" >/dev/null 2>&1 || true
+  fi
+fi
+
+: > "$LOG_FILE"
 "$CONTAINER_CLI" logs -f "$CONTAINER_NAME" >"$LOG_FILE" 2>&1 &
 LOG_PID=$!
-echo "$LOG_PID" > "${LOG_DIR}/${CONTAINER_NAME}.log.pid"
+echo "$LOG_PID" > "$PID_FILE"
 
 echo "vLLM is starting. Check logs with:"
 echo "  $CONTAINER_CLI logs -f $CONTAINER_NAME"
