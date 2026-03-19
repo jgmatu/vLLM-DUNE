@@ -24,6 +24,7 @@ MODEL_DIR="${MODEL_DIR:-models/Qwen2.5-7B-Instruct}"
 MODEL_REVISION="${MODEL_REVISION:-main}"
 SKIP_HOST_SETUP="${SKIP_HOST_SETUP:-0}"
 SKIP_DOWNLOAD="${SKIP_DOWNLOAD:-0}"
+CONTAINER_CLI="${CONTAINER_CLI:-docker}"
 
 echo "==> bootstrap_and_run"
 echo "MODEL_ID=$MODEL_ID"
@@ -31,6 +32,7 @@ echo "MODEL_DIR=$MODEL_DIR"
 echo "MODEL_REVISION=$MODEL_REVISION"
 echo "SKIP_HOST_SETUP=$SKIP_HOST_SETUP"
 echo "SKIP_DOWNLOAD=$SKIP_DOWNLOAD"
+echo "CONTAINER_CLI=$CONTAINER_CLI"
 echo
 
 if [[ ! -f "install_offline.sh" ]] || [[ ! -f "models/download_model.sh" ]] || [[ ! -f "run_vllm_docker_local.sh" ]]; then
@@ -53,7 +55,7 @@ else
 fi
 
 echo "==> Step 3/3: Start vLLM container"
-bash run_vllm_docker_local.sh "$MODEL_DIR"
+CONTAINER_CLI="$CONTAINER_CLI" bash run_vllm_docker_local.sh "$MODEL_DIR"
 
 echo
 echo "Done. Quick checks:"

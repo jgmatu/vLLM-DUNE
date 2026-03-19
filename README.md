@@ -19,7 +19,8 @@ Arranque con reintento automatico (OOM-friendly en 12GB VRAM):
 
 `bash start_retry.sh`
 
-El reintento prueba 3 perfiles: `balanced`, `aggressive` y `safe-eager` (con `--enforce-eager`).
+El reintento prueba 3 perfiles: `balanced-stable`, `aggressive-stable` y `safe-eager` (todos con `--enforce-eager` y batch reducido para evitar `CUBLAS_STATUS_ALLOC_FAILED`).
+Nota: si aparece `No available memory for the cache blocks`, hay que subir `GPU_MEMORY_UTILIZATION` (no bajarlo) y reducir batch/seq.
 
 Para limpiar contenedor y artefactos:
 

@@ -55,18 +55,18 @@ run_profile() {
   return 1
 }
 
-# Profile A: balanced
-if run_profile "balanced" "float16" "2048" "0.72" "4" ""; then
+# Profile A: balanced-stable
+if run_profile "balanced-stable" "float16" "1024" "0.82" "4" "--enforce-eager --max-num-batched-tokens 256 --max-num-seqs 4"; then
   exit 0
 fi
 
-# Profile B: aggressive memory saving
-if run_profile "aggressive" "float16" "1024" "0.60" "6" ""; then
+# Profile B: aggressive memory saving but higher KV allocation
+if run_profile "aggressive-stable" "float16" "768" "0.88" "6" "--enforce-eager --max-num-batched-tokens 192 --max-num-seqs 3"; then
   exit 0
 fi
 
 # Profile C: safest startup for fragmented/limited VRAM
-if run_profile "safe-eager" "float16" "1024" "0.50" "8" "--enforce-eager --max-num-batched-tokens 512 --max-num-seqs 8"; then
+if run_profile "safe-eager" "float16" "512" "0.92" "8" "--enforce-eager --max-num-batched-tokens 128 --max-num-seqs 2"; then
   exit 0
 fi
 
