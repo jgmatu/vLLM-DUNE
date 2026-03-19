@@ -129,7 +129,6 @@ Porque ya tienen Twitter.
 Ejemplo de generacion de codigo con vLLM:
 
 ```text
-javi@localhost:~/OpenSource/vLLM-DUNE$ python3 src/test_agent.py "serias capaz de hacerme un bucle de programacion en C++?"
 === Prompt ===
 serias capaz de hacerme un bucle de programacion en C++?
 
