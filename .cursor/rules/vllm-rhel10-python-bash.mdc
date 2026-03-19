@@ -1,0 +1,36 @@
+---
+description: vLLM project conventions for Python, Bash, and RHEL10 container workflow
+alwaysApply: true
+---
+
+# vLLM RHEL10 Project Rule
+
+## Scope and defaults
+- This repo targets RHEL10 hosts and NVIDIA GPUs.
+- Runtime default is Podman-compatible flow; Docker CLI may be Podman emulation.
+- vLLM container base is Ubuntu 22.04 due to current RHEL10 image constraints.
+
+## Script and path conventions
+- Keep executable entrypoints in `scripts/`; wrappers in `runner/`, `stats/`, and `initialize/`.
+- Every Bash entrypoint must resolve `ROOT_DIR` and `cd "$ROOT_DIR"` before relative paths.
+- Do not reference root scripts that do not exist; prefer `scripts/<name>.sh`.
+
+## Bash quality guardrails
+- Use `#!/usr/bin/env bash` and `set -euo pipefail`.
+- Quote variable expansions and paths (`"$VAR"`), especially for model paths and logs.
+- Prefer idempotent checks (existence tests) before remove/build/run operations.
+- Never use destructive git commands from automation scripts.
+
+## Python and API expectations
+- Keep Python scripts CLI-friendly and configurable via env vars (e.g., base URL, model, max tokens).
+- For test clients, respect server `MAX_MODEL_LEN`; avoid hardcoded token outputs that can exceed context.
+- Keep OpenAI-compatible checks explicit: `/v1/models` before generation tests.
+
+## GPU and runtime checks
+- Validate `nvidia-smi` on host and inside container runtime before starting vLLM.
+- Preserve support for both real Docker and Podman-emulated Docker.
+- Favor conservative memory knobs on 12GB VRAM (`float16`, reduced `max-model-len`, low batch/seq).
+
+## Documentation expectations
+- Keep commands in docs aligned with actual script locations under `scripts/`.
+- If script layout changes, update wrappers and README examples in the same change.
