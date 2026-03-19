@@ -1,7 +1,45 @@
 # vLLM-DUNE
 Base conceptual de una vLLM air-gapped para entornos RHEL10
 
-## Arranque rapido con Docker + NVIDIA (RHEL 10 host)
+## Uso recomendado (RHEL10 + Podman + NVIDIA)
+
+### 1) Preparar host desde cero
+
+Ejecuta:
+
+`sudo bash install_offline.sh`
+
+Este script:
+- valida `nvidia-smi` en host,
+- instala `nvidia-container-toolkit`,
+- crea `/etc/containers/nodocker`,
+- prueba GPU en contenedor con `docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04`.
+
+### 2) Descargar modelo en `models/`
+
+Dependencia minima:
+
+`python3 -m pip install -U huggingface_hub`
+
+Ejemplos:
+- `bash models/download_model.sh "Qwen/Qwen2.5-7B-Instruct"`
+- `bash models/download_model.sh "Qwen/Qwen2.5-7B-Instruct" "models/qwen2.5-7b" "main"`
+- `HF_TOKEN=hf_xxx bash models/download_model.sh "org/model-privado"`
+
+### 3) Levantar vLLM con el modelo local
+
+Ejemplo:
+
+`bash run_vllm_podman_local.sh "models/qwen2.5-7b"`
+
+### 4) Verificar servicio
+
+- `curl http://localhost:8000/v1/models`
+- `podman logs -f vllm-dune`
+
+---
+
+## Alternativa: Docker Compose
 
 1. Pre-requisitos en el host:
    - Driver NVIDIA instalado (`nvidia-smi` debe funcionar).
@@ -22,27 +60,3 @@ Base conceptual de una vLLM air-gapped para entornos RHEL10
 Archivos principales:
 - `docker-images/Dockerfile.vllm-nvidia-rhel10`: imagen base CUDA + vLLM.
 - `docker-compose.yaml`: servicio vLLM con reserva de GPU.
-
-## Descargar modelo en `models/`
-
-Script incluido: `models/download_model.sh`
-
-1. Dependencia minima:
-   - `python3 -m pip install -U huggingface_hub`
-
-2. Descargar modelo:
-   - `bash models/download_model.sh "Qwen/Qwen2.5-7B-Instruct"`
-   - Opcional destino/revision: `bash models/download_model.sh "Qwen/Qwen2.5-7B-Instruct" "models/qwen2.5-7b" "main"`
-   - Si el repo es privado: `HF_TOKEN=hf_xxx bash models/download_model.sh "org/model-privado"`
-
-## Script de bootstrap RHEL10 + Podman + NVIDIA
-
-Ejecuta desde cero:
-
-- `sudo bash install_offline.sh`
-
-Este script:
-- valida `nvidia-smi` en host,
-- instala `nvidia-container-toolkit`,
-- crea `/etc/containers/nodocker`,
-- prueba GPU en contenedor con `docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04`.

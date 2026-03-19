@@ -39,3 +39,8 @@
 
 # debug information files
 *.dwo
+
+# Downloaded model artifacts
+models/*
+!models/note.txt
+!models/download_model.sh
