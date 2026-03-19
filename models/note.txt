@@ -1,1 +1,0 @@
- # Instrucciones y scripts (huggingface-cli) para descarga

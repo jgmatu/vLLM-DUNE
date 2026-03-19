@@ -28,9 +28,23 @@ Ejemplos:
 
 ### 3) Levantar vLLM con el modelo local
 
-Ejemplo:
+Pasos con tu carpeta actual (`models/Qwen2.5-7B-Instruct`):
 
-`bash run_vllm_podman_local.sh "models/qwen2.5-7b"`
+1. Arrancar contenedor:
+   - `bash run_vllm_docker_local.sh "models/Qwen2.5-7B-Instruct"`
+
+2. Ver logs de carga del modelo:
+   - `docker logs -f vllm-dune`
+
+3. Probar endpoint OpenAI-compatible:
+   - `curl http://localhost:8000/v1/models`
+
+4. (Opcional) Probar una generacion:
+   - `curl http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"Qwen2.5-7B-Instruct","messages":[{"role":"user","content":"Di hola en una linea"}]}'`
+
+Tambien puedes usar script Docker-compatible (Docker o Podman emulando Docker):
+
+`bash run_vllm_docker_local.sh "models/Qwen2.5-7B-Instruct"`
 
 ### 4) Verificar servicio
 
