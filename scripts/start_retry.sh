@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Always resolve repo root to avoid path issues.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
 # Start vLLM with retry profiles for 12GB-class GPUs.
 #
 # Usage:
@@ -13,6 +17,21 @@ HEALTH_URL="${HEALTH_URL:-http://localhost:8000/v1/models}"
 
 if [[ ! -f "run_model_only.sh" ]] || [[ ! -f "cleanup.sh" ]]; then
   echo "ERROR: run from repository root."
+  exit 1
+fi
+
+RUN_MODEL_ONLY_SCRIPT="${ROOT_DIR}/scripts/run_model_only.sh"
+if [[ ! -f "$RUN_MODEL_ONLY_SCRIPT" ]]; then
+  RUN_MODEL_ONLY_SCRIPT="${ROOT_DIR}/run_model_only.sh"
+fi
+
+CLEANUP_SCRIPT="${ROOT_DIR}/scripts/cleanup.sh"
+if [[ ! -f "$CLEANUP_SCRIPT" ]]; then
+  CLEANUP_SCRIPT="${ROOT_DIR}/cleanup.sh"
+fi
+
+if [[ ! -f "$RUN_MODEL_ONLY_SCRIPT" ]] || [[ ! -f "$CLEANUP_SCRIPT" ]]; then
+  echo "ERROR: missing run/model scripts (checked scripts/ and repo root)."
   exit 1
 fi
 
@@ -31,7 +50,7 @@ run_profile() {
     echo "EXTRA_VLLM_ARGS=$extra_vllm_args"
   fi
 
-  bash cleanup.sh >/dev/null 2>&1 || true
+  bash "$CLEANUP_SCRIPT" >/dev/null 2>&1 || true
 
   MODEL_DIR="$MODEL_DIR" \
   CONTAINER_CLI="$CONTAINER_CLI" \
@@ -40,7 +59,7 @@ run_profile() {
   GPU_MEMORY_UTILIZATION="$gpu_mem" \
   CPU_OFFLOAD_GB="$cpu_offload" \
   EXTRA_VLLM_ARGS="$extra_vllm_args" \
-  bash run_model_only.sh || return 1
+  bash "$RUN_MODEL_ONLY_SCRIPT" || return 1
 
   # wait for startup
   for _ in {1..25}; do

@@ -10,10 +10,18 @@ def main() -> int:
     base_url = os.getenv("VLLM_BASE_URL", "http://localhost:8000")
     model = os.getenv("VLLM_MODEL", "Qwen2.5-7B-Instruct")
     stream = False
+    max_tokens = int(os.getenv("MAX_TOKENS", "128"))
     args = sys.argv[1:]
     if "--stream" in args:
         stream = True
         args = [a for a in args if a != "--stream"]
+    if "--max-tokens" in args:
+        idx = args.index("--max-tokens")
+        if idx + 1 >= len(args):
+            print("ERROR: --max-tokens requires a value")
+            return 1
+        max_tokens = int(args[idx + 1])
+        args = [a for i, a in enumerate(args) if i not in (idx, idx + 1)]
     prompt = " ".join(args).strip() or "Di hola en una linea."
 
     payload = {
@@ -23,7 +31,7 @@ def main() -> int:
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.2,
-        "max_tokens": 128,
+        "max_tokens": max_tokens,
         "stream": stream,
     }
 

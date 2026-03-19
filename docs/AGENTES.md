@@ -46,3 +46,4 @@ Si, **es viable** usar Continue con vLLM en air-gapped, siempre que:
 - Politica de API key definida (on/off, rotacion, auditoria).
 - Validacion funcional desde cliente CLI/Python antes de VSCode.
 - Procedimiento de rollback de extension/agente documentado.
+

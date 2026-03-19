@@ -78,3 +78,4 @@ After startup:
 2. GPU process is visible in `nvidia-smi`
 3. VRAM usage remains below hard OOM threshold during first prompt
 4. No repeated `EngineCore failed to start` in runtime logs
+

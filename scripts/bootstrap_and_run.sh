@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Always resolve repo root to avoid path issues.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
 # End-to-end helper:
 # 1) Prepare host (optional): install_offline.sh
 # 2) Download model (optional): models/download_model.sh
@@ -35,27 +39,41 @@ echo "SKIP_DOWNLOAD=$SKIP_DOWNLOAD"
 echo "CONTAINER_CLI=$CONTAINER_CLI"
 echo
 
-if [[ ! -f "install_offline.sh" ]] || [[ ! -f "models/download_model.sh" ]] || [[ ! -f "run_vllm_docker_local.sh" ]]; then
-  echo "ERROR: Run this script from repository root."
+INSTALL_OFFLINE_SCRIPT="${ROOT_DIR}/scripts/install_offline.sh"
+if [[ ! -f "$INSTALL_OFFLINE_SCRIPT" ]] || [[ ! -f "$ROOT_DIR/models/download_model.sh" ]] || [[ ! -d "$ROOT_DIR/models" ]]; then
+  echo "ERROR: Missing expected scripts/data paths."
+  echo "Expected:"
+  echo "  $INSTALL_OFFLINE_SCRIPT"
+  echo "  $ROOT_DIR/models/download_model.sh"
   exit 1
 fi
 
 if [[ "$SKIP_HOST_SETUP" != "1" ]]; then
   echo "==> Step 1/3: Host setup (requires sudo)"
-  sudo bash install_offline.sh
+  sudo bash "$INSTALL_OFFLINE_SCRIPT"
 else
   echo "==> Step 1/3: Skipped host setup"
 fi
 
 if [[ "$SKIP_DOWNLOAD" != "1" ]]; then
   echo "==> Step 2/3: Download model (if needed)"
-  bash models/download_model.sh "$MODEL_ID" "$MODEL_DIR" "$MODEL_REVISION"
+  bash "$ROOT_DIR/models/download_model.sh" "$MODEL_ID" "$MODEL_DIR" "$MODEL_REVISION"
 else
   echo "==> Step 2/3: Skipped model download"
 fi
 
+RUN_VLLM_DOCKER_SCRIPT="${ROOT_DIR}/scripts/run_vllm_docker_local.sh"
+if [[ ! -f "$RUN_VLLM_DOCKER_SCRIPT" ]]; then
+  RUN_VLLM_DOCKER_SCRIPT="${ROOT_DIR}/run_vllm_docker_local.sh"
+fi
+
+if [[ ! -f "$RUN_VLLM_DOCKER_SCRIPT" ]]; then
+  echo "ERROR: run_vllm_docker_local.sh not found in scripts/ or repo root."
+  exit 1
+fi
+
 echo "==> Step 3/3: Start vLLM container"
-CONTAINER_CLI="$CONTAINER_CLI" bash run_vllm_docker_local.sh "$MODEL_DIR"
+CONTAINER_CLI="$CONTAINER_CLI" bash "$RUN_VLLM_DOCKER_SCRIPT" "$MODEL_DIR"
 
 echo
 echo "Done. Quick checks:"

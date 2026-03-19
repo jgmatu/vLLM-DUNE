@@ -44,7 +44,7 @@ La plataforma debe permitir:
 ### Escenario C: 2+ nodos, 4-8 GPUs por nodo
 
 - Uso: cluster de inferencia multi-modelo.
-- Requiere red de baja latencia (200GbE o InfiniBand segun diseno).
+- Requiere red de baja latencia (200GbE o InfiniBand segun diseño).
 
 ## 5) Especificacion tecnica recomendada (servidor IA air-gapped)
 

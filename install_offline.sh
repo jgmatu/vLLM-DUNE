@@ -1,78 +1,98 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bootstrap script for RHEL 10 + Podman + NVIDIA GPU containers.
-# It prepares NVIDIA container runtime pieces and validates with nvidia-smi
-# inside a CUDA container pulled from docker.io.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ "${EUID}" -ne 0 ]]; then
-  echo "This script needs root privileges."
-  echo "Run with: sudo bash install_offline.sh"
+SUDO=""
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  SUDO="sudo"
+fi
+
+echo "==> install_offline"
+echo "ROOT_DIR=$ROOT_DIR"
+echo
+
+# Allow skipping heavyweight steps if the host is already prepared.
+SKIP_NVIDIA_TOOLKIT="${SKIP_NVIDIA_TOOLKIT:-0}"   # set to 1 to only validate
+SKIP_PODMAN_INSTALL="${SKIP_PODMAN_INSTALL:-0}"   # set to 1 to only validate
+SKIP_GPU_TEST="${SKIP_GPU_TEST:-0}"               # set to 1 to skip container test
+
+have_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+echo "==> Check host GPU (nvidia-smi)"
+if ! have_cmd nvidia-smi; then
+  echo "ERROR: nvidia-smi no encontrado en el host."
+  exit 1
+fi
+nvidia-smi >/dev/null
+echo "OK: nvidia-smi funciona."
+
+echo "==> Ensure /etc/containers/nodocker (silence podman docker emulation msg)"
+"$SUDO" mkdir -p /etc/containers
+"$SUDO" touch /etc/containers/nodocker
+
+echo "==> Ensure Podman present"
+if ! have_cmd podman; then
+  if [[ "$SKIP_PODMAN_INSTALL" == "1" ]]; then
+    echo "ERROR: podman no está instalado y SKIP_PODMAN_INSTALL=1."
+    exit 1
+  fi
+  if have_cmd dnf; then
+    echo "Installing podman via dnf ..."
+    "$SUDO" dnf -y install podman || true
+  fi
+fi
+
+if ! have_cmd podman; then
+  echo "ERROR: podman no está disponible."
+  exit 1
+fi
+podman --version || true
+
+echo "==> Ensure NVIDIA Container Toolkit present"
+if ! have_cmd nvidia-ctk; then
+  if [[ "$SKIP_NVIDIA_TOOLKIT" == "1" ]]; then
+    echo "WARN: nvidia-ctk no encontrado y SKIP_NVIDIA_TOOLKIT=1."
+  else
+    if have_cmd dnf; then
+      echo "Installing nvidia-container-toolkit via dnf ..."
+      "$SUDO" dnf -y install nvidia-container-toolkit || true
+    fi
+  fi
+fi
+
+if ! have_cmd nvidia-ctk; then
+  echo "ERROR: nvidia-ctk no está disponible; no puedo configurar el runtime para Podman."
+  echo "Solución: instala NVIDIA Container Toolkit en el host o vuelve a ejecutar con red/paquetes disponibles."
   exit 1
 fi
 
-echo "==> Step 1: Host diagnostics"
-if command -v mokutil >/dev/null 2>&1; then
-  mokutil --sb-state || true
-else
-  echo "mokutil not found; skipping Secure Boot check."
+"$SUDO" nvidia-ctk runtime configure --runtime=podman || true
+
+# Hooks are expected by Podman GPU integration.
+"$SUDO" mkdir -p /usr/share/containers/oci/hooks.d
+
+echo "==> Validation (GPU in container via Podman hooks)"
+if [[ "$SKIP_GPU_TEST" == "1" ]]; then
+  echo "SKIP_GPU_TEST=1 => saltando prueba de contenedor."
+  exit 0
 fi
 
-if ! command -v nvidia-smi >/dev/null 2>&1; then
-  echo "ERROR: nvidia-smi is not available on host."
-  echo "Install NVIDIA driver first, then re-run."
-  exit 1
-fi
+# Image name matches the ones used in the vLLM scripts.
+CUDA_IMAGE="docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04"
 
-if ! nvidia-smi >/dev/null 2>&1; then
-  echo "ERROR: nvidia-smi exists but cannot talk to NVIDIA driver."
-  echo "Fix host driver state first, then re-run."
-  exit 1
-fi
+echo "Pull/test image: $CUDA_IMAGE"
 
-echo "Host NVIDIA driver looks healthy."
-
-echo "==> Step 2: Ensure Podman is installed"
-if ! command -v podman >/dev/null 2>&1; then
-  dnf install -y podman
-fi
-
-echo "==> Step 3: Configure NVIDIA repo for libnvidia-container"
-cat >/etc/yum.repos.d/nvidia-container-toolkit.repo <<'EOF'
-[nvidia-container-toolkit]
-name=NVIDIA Container Toolkit
-baseurl=https://nvidia.github.io/libnvidia-container/stable/rpm/$basearch
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://nvidia.github.io/libnvidia-container/gpgkey
-EOF
-
-echo "==> Step 4: Install NVIDIA container toolkit"
-dnf clean all
-dnf install -y nvidia-container-toolkit
-
-echo "==> Step 5: Enable Docker CLI emulation quiet mode"
-mkdir -p /etc/containers
-touch /etc/containers/nodocker
-
-echo "==> Step 6: Validate hook directory"
-if [[ ! -d /usr/share/containers/oci/hooks.d ]]; then
-  echo "WARNING: hooks directory not found: /usr/share/containers/oci/hooks.d"
-  echo "Podman GPU injection may fail without OCI hooks."
-fi
-
-echo "==> Step 7: Pull CUDA image from docker.io (explicit registry)"
-podman pull docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04
-
-echo "==> Step 8: Run GPU test inside container"
-podman run --rm \
+if ! podman run --rm \
   --hooks-dir=/usr/share/containers/oci/hooks.d \
   --security-opt=label=disable \
   --device nvidia.com/gpu=all \
-  docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04 \
-  nvidia-smi
+  "$CUDA_IMAGE" nvidia-smi -L >/dev/null 2>&1; then
+  echo "ERROR: La GPU NO se ve dentro del contenedor (Podman + NVIDIA hooks falló)."
+  echo "Revisa que el runtime de Podman esté configurado correctamente y vuelve a ejecutar."
+  exit 1
+fi
 
-echo
-echo "SUCCESS: Podman can access NVIDIA GPU in container."
-echo "Next step: run your vLLM container/build."
+echo "OK: GPU visible dentro del contenedor."
+echo "==> install_offline: done"
+

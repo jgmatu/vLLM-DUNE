@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Always resolve repo root to avoid path issues.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
 # Run model only (no install, no download).
 # Requires host/toolkit/image already prepared and model already present.
 #
@@ -19,8 +23,13 @@ if [[ ! -d "$MODEL_DIR" ]]; then
   exit 1
 fi
 
-if [[ ! -f "run_vllm_docker_local.sh" ]]; then
-  echo "ERROR: run_vllm_docker_local.sh not found. Run from repo root."
+RUN_VLLM_SCRIPT="${ROOT_DIR}/scripts/run_vllm_docker_local.sh"
+if [[ ! -f "$RUN_VLLM_SCRIPT" ]]; then
+  RUN_VLLM_SCRIPT="${ROOT_DIR}/run_vllm_docker_local.sh"
+fi
+
+if [[ ! -f "$RUN_VLLM_SCRIPT" ]]; then
+  echo "ERROR: run_vllm_docker_local.sh not found in 'scripts/' or repo root."
   exit 1
 fi
 
@@ -35,4 +44,4 @@ if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi >/dev/null 2>&1; then
 fi
 
 echo "Starting model with local directory: $MODEL_DIR"
-MODEL_NAME="$MODEL_NAME" CONTAINER_CLI="$CONTAINER_CLI" bash run_vllm_docker_local.sh "$MODEL_DIR"
+MODEL_NAME="$MODEL_NAME" CONTAINER_CLI="$CONTAINER_CLI" bash "$RUN_VLLM_SCRIPT" "$MODEL_DIR"
