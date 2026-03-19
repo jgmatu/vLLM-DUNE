@@ -1,7 +1,7 @@
 javi@localhost:~/OpenSource/vLLM-DUNE$ mokutil --sb-state
 SecureBoot disabled
 javi@localhost:~/OpenSource/vLLM-DUNE$ nvidia-smi
-Thu Mar 19 12:42:45 2026       
+Thu Mar 19 15:34:31 2026       
 +-----------------------------------------------------------------------------------------+
 | NVIDIA-SMI 590.48.01              Driver Version: 590.48.01      CUDA Version: 13.1     |
 +-----------------------------------------+------------------------+----------------------+
@@ -10,7 +10,7 @@ Thu Mar 19 12:42:45 2026
 |                                         |                        |               MIG M. |
 |=========================================+========================+======================|
 |   0  NVIDIA GeForce RTX 4070 Ti     Off |   00000000:2D:00.0  On |                  N/A |
-|  0%   32C    P8              9W /  285W |     370MiB /  12282MiB |      0%      Default |
+|  0%   38C    P8             16W /  285W |   11133MiB /  12282MiB |      2%      Default |
 |                                         |                        |                  N/A |
 +-----------------------------------------+------------------------+----------------------+
 
@@ -19,9 +19,12 @@ Thu Mar 19 12:42:45 2026
 |  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
 |        ID   ID                                                               Usage      |
 |=========================================================================================|
-|    0   N/A  N/A            3238      G   /usr/bin/gnome-shell                    182MiB |
-|    0   N/A  N/A            4178    C+G   /usr/bin/ptyxis                          47MiB |
-|    0   N/A  N/A            4273      G   /usr/bin/Xwayland                         3MiB |
-|    0   N/A  N/A            4568      G   /usr/share/cursor/cursor                 77MiB |
+|    0   N/A  N/A            3238      G   /usr/bin/gnome-shell                    104MiB |
+|    0   N/A  N/A            4178    C+G   /usr/bin/ptyxis                          51MiB |
+|    0   N/A  N/A            4273      G   /usr/bin/Xwayland                         4MiB |
+|    0   N/A  N/A            4568      G   /usr/share/cursor/cursor                133MiB |
+|    0   N/A  N/A           83859      C   VLLM::EngineCore                      10666MiB |
+|    0   N/A  N/A           86298      G   /usr/lib64/firefox/firefox               67MiB |
 +-----------------------------------------------------------------------------------------+
+
 
