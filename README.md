@@ -19,7 +19,7 @@ Arranque con reintento automatico (OOM-friendly en 12GB VRAM):
 
 `bash start_retry.sh`
 
-El reintento prueba 3 perfiles: `balanced-stable`, `aggressive-stable` y `safe-eager` (todos con `--enforce-eager` y batch reducido para evitar `CUBLAS_STATUS_ALLOC_FAILED`).
+El reintento prueba 4 perfiles: `balanced-stable`, `aggressive-stable`, `safe-eager` y `ultra-min` (todos con `--enforce-eager` y batch reducido para evitar `CUBLAS_STATUS_ALLOC_FAILED`).
 Nota: si aparece `No available memory for the cache blocks`, hay que subir `GPU_MEMORY_UTILIZATION` (no bajarlo) y reducir batch/seq.
 
 Para limpiar contenedor y artefactos:
@@ -103,6 +103,17 @@ Script: `src/test_agent.py`
   - `python3 src/test_agent.py --stream "hola, responde en una frase"`
 - Si cambias endpoint/modelo:
   - `VLLM_BASE_URL="http://localhost:8000" VLLM_MODEL="Qwen2.5-7B-Instruct" python3 src/test_agent.py "hola"`
+
+Ejemplo de output real de vLLM (`--stream`):
+
+```text
+=== Stream (anon) ===
+Claro, aquí tienes uno:
+
+¿Qué hace una abeja en el gimnasio?
+
+Zum-ba.
+```
 
 ### 6) Stats GPU extendidas
 

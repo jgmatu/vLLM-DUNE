@@ -70,6 +70,11 @@ if run_profile "safe-eager" "float16" "512" "0.92" "8" "--enforce-eager --max-nu
   exit 0
 fi
 
+# Profile D: ultra-min bootstrap (prioritize successful startup)
+if run_profile "ultra-min" "float16" "256" "0.97" "8" "--enforce-eager --max-num-batched-tokens 64 --max-num-seqs 1"; then
+  exit 0
+fi
+
 echo
 echo "ERROR: retries exhausted."
 echo "Check latest logs in logs/ and run:"
