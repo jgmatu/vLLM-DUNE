@@ -29,6 +29,10 @@ Opcional limpieza completa:
 
 `bash cleanup.sh --all`
 
+Limpiar solo contenedor + imagen (para forzar rebuild):
+
+`bash cleanup.sh --purge-image`
+
 ### 1) Preparar host desde cero
 
 Ejecuta:
@@ -98,6 +102,57 @@ Script: `src/test_agent.py`
   - `python3 src/test_agent.py --stream "hola, responde en una frase"`
 - Si cambias endpoint/modelo:
   - `VLLM_BASE_URL="http://localhost:8000" VLLM_MODEL="Qwen2.5-7B-Instruct" python3 src/test_agent.py "hola"`
+
+### 6) Stats GPU extendidas
+
+Script simple (`gpu_stats.sh`):
+- Una sola muestra:
+  - `ONCE=1 bash gpu_stats.sh`
+- Modo live:
+  - `bash gpu_stats.sh`
+- Modo live cada 1s:
+  - `INTERVAL=1 bash gpu_stats.sh`
+
+Script extendido (`gpu_stats_extended.sh`):
+- Snapshot:
+  - `bash gpu_stats_extended.sh`
+- Tabla clasica exacta de `nvidia-smi`:
+  - `TABLE_ONLY=1 bash gpu_stats_extended.sh`
+- Live:
+  - `MODE=live INTERVAL=2 bash gpu_stats_extended.sh`
+- Live sin limpiar pantalla:
+  - `MODE=live NO_CLEAR=1 bash gpu_stats_extended.sh`
+
+Ejemplo de salida ASCII (`TABLE_ONLY=1 bash gpu_stats_extended.sh`):
+
+```text
+Thu Mar 19 14:15:40 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 590.48.01              Driver Version: 590.48.01      CUDA Version: 13.1     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 4070 Ti     Off |   00000000:2D:00.0  On |                  N/A |
+|  0%   35C    P8             16W /  285W |     298MiB /  12282MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A            3238      G   /usr/bin/gnome-shell                     82MiB |
+|    0   N/A  N/A            4178    C+G   /usr/bin/ptyxis                          51MiB |
+|    0   N/A  N/A            4273      G   /usr/bin/Xwayland                         4MiB |
+|    0   N/A  N/A            4568      G   /usr/share/cursor/cursor                 96MiB |
++-----------------------------------------------------------------------------------------+
+```
+- Verbose:
+  - `VERBOSE=1 bash gpu_stats_extended.sh`
+  - `MODE=live VERBOSE=1 FULL_TABLE=1 INTERVAL=3 bash gpu_stats_extended.sh`
 
 ---
 

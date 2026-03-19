@@ -18,6 +18,10 @@ fi
 
 print_snapshot() {
   date '+%Y-%m-%d %H:%M:%S'
+  nvidia-smi | awk '/NVIDIA-SMI/ {print "nvidia_smi_version, " $3; exit}'
+  echo "=== NVIDIA-SMI Full Table ==="
+  nvidia-smi
+  echo
   echo "=== GPU Summary ==="
   nvidia-smi --query-gpu=index,name,utilization.gpu,utilization.memory,memory.used,memory.total,temperature.gpu,power.draw,power.limit \
     --format=csv,noheader,nounits
