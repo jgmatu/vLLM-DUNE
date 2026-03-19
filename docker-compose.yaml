@@ -1,1 +1,34 @@
-# Para orquestar vLLM + Agente + VectorDB
+services:
+  vllm:
+    build:
+      context: .
+      dockerfile: docker-images/Dockerfile.vllm-nvidia-rhel10
+    image: vllm-dune:cuda12.4
+    container_name: vllm-dune
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Cambia este valor por tu modelo local o de Hugging Face.
+      MODEL_ID: ${MODEL_ID:-Qwen/Qwen2.5-7B-Instruct}
+      HF_TOKEN: ${HF_TOKEN:-}
+      VLLM_HOST: 0.0.0.0
+      VLLM_PORT: 8000
+      MAX_MODEL_LEN: ${MAX_MODEL_LEN:-4096}
+      GPU_MEMORY_UTILIZATION: ${GPU_MEMORY_UTILIZATION:-0.90}
+    volumes:
+      # Cache de Hugging Face para no re-descargar pesos cada vez.
+      - ./models/hf-cache:/root/.cache/huggingface
+    command: >
+      --model ${MODEL_ID:-Qwen/Qwen2.5-7B-Instruct}
+      --host ${VLLM_HOST:-0.0.0.0}
+      --port ${VLLM_PORT:-8000}
+      --max-model-len ${MAX_MODEL_LEN:-4096}
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.90}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

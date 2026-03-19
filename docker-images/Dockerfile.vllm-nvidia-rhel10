@@ -1,0 +1,24 @@
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# vLLM recomienda usar imágenes CUDA en Linux host con NVIDIA Container Toolkit.
+# El host puede ser RHEL 10; dentro del contenedor usamos Ubuntu para estabilidad.
+RUN python3 -m pip install --upgrade pip setuptools wheel \
+    && python3 -m pip install "vllm>=0.8.0"
+
+EXPOSE 8000
+
+ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]
