@@ -1,160 +1,135 @@
-# Hardware Guide for vLLM (Air-Gapped, NVIDIA A100/H100)
+# Hardware Design Guide vLLM Air-Gapped (20-40 devs)
 
-## 1) Objetivo
+## 1) Contexto y objetivo
 
-Definir una base de infraestructura de hardware para servir modelos con vLLM en entornos air-gapped, usando GPUs NVIDIA A100 para:
+Este documento define el diseno de hardware para una plataforma vLLM en entorno air-gapped, orientada a un uso diario de ingenieria con agente IA + IDE (patron similar a Cursor) para un equipo de hasta 40 desarrolladores.
 
-- mayor capacidad de VRAM por GPU,
-- mejor estabilidad de inferencia en modelos 7B+,
-- escalado horizontal y vertical de throughput.
+Objetivos principales:
 
-## 2) Requisitos funcionales
+- experiencia interactiva estable para tareas de codigo,
+- capacidad para picos de concurrencia en horario laboral,
+- operacion segura en entorno aislado,
+- coste total controlado (CAPEX + OPEX).
 
-La plataforma debe permitir:
+## 2) Perfil de uso de ingenieria (dimensionamiento humano)
 
-- carga de modelos grandes sin ajustes extremos de memoria,
-- servicio OpenAI-compatible de vLLM con baja latencia,
-- operación sin salida a internet (air-gapped),
-- mantenimiento y observabilidad local.
+Supuestos de capacidad por equipo:
 
-## 3) Opciones de GPU A100 recomendadas
+- tamano de equipo: 20-40 desarrolladores,
+- concurrencia real simultanea: 25-45%,
+- sesiones activas pico: 5-18,
+- mezcla de carga: chat tecnico, depuracion, refactor y generacion de codigo,
+- modelo de referencia de calidad: 70B instruct distribuido,
+- contexto habitual: 2k-8k tokens.
 
-### A100 40GB (PCIe/SXM)
+Implicacion de diseno:
 
-- Adecuada para 7B/13B con margen de KV cache.
-- Buen equilibrio costo/rendimiento para inferencia.
+- no dimensionar por total de usuarios, sino por concurrencia real y p95,
+- reservar margen de 30-80% sobre throughput medio para picos.
 
-### A100 80GB (PCIe/SXM)
+## 3) SLO tecnicos objetivo
 
-- Recomendada para 30B+ y contextos largos.
-- Mayor margen para batching y concurrencia.
+Para considerar el servicio apto para ingenieria:
 
-### H100 80GB (PCIe/SXM)
+- p50 tiempo a primer token: <= 1.5-2.5 s,
+- p95 tiempo a primer token: <= 4-6 s,
+- tasa de error de inferencia: < 1%,
+- utilizacion GPU sostenida en pico: 65-85%.
 
-- Recomendada para cargas de alta concurrencia, latencia baja y modelos grandes.
-- Mejor rendimiento por GPU para inferencia intensiva y contextos largos.
-- Mayor coste inicial, pero menor coste por token en cargas sostenidas.
+## 4) Matriz de decision (capacidad y presupuesto)
 
-## 4) Topologias recomendadas
+Rangos orientativos 2026, sin IVA ni obra de CPD.
 
-### Escenario A: 1 nodo, 1-2 GPUs A100
+- **Opcion A - PoC base**
+  - Infra: 1 nodo, 2x A100 40GB
+  - Throughput agregado: 220-550 tok/s
+  - Equipo objetivo: laboratorio / preproduccion pequena
+  - CAPEX: 45k-90k EUR
 
-- Uso: PoC robusta / entorno preproduccion air-gapped.
-- Beneficio: simplicidad operativa.
+- **Opcion B - Produccion inicial 20 dev**
+  - Infra: 2 nodos, 4x A100 80GB por nodo
+  - Throughput agregado: 700-1500 tok/s
+  - Equipo objetivo: hasta 20 dev (o 30 con carga moderada)
+  - CAPEX: 320k-700k EUR
 
-### Escenario B: 1 nodo, 4 GPUs A100
+- **Opcion C - Produccion recomendada 20-40 dev**
+  - Infra: 2 nodos, 4x H100 80GB por nodo
+  - Throughput agregado: 1400-3000 tok/s
+  - Equipo objetivo: 20-40 dev con picos frecuentes
+  - CAPEX: 640k-1.1M EUR
 
-- Uso: produccion con alta concurrencia.
-- Beneficio: paralelismo tensor/data y mayor throughput.
+Decision rapida:
 
-### Escenario C: 2+ nodos, 4-8 GPUs por nodo
+- si el objetivo es PoC: Opcion A,
+- si el objetivo es servicio usable para 20 dev: Opcion B,
+- si el objetivo es 40 dev con UX consistente: Opcion C.
 
-- Uso: cluster de inferencia multi-modelo.
-- Requiere red de baja latencia (200GbE o InfiniBand segun diseño).
+## 5) Especificacion tecnica por nodo (referencia)
 
-## 5) Especificacion tecnica recomendada (servidor IA air-gapped)
+### Nodo A100 (produccion inicial)
 
-### Perfil minimo (A100 40GB x2)
+- CPU: 2x EPYC/Xeon (>=64 cores totales),
+- RAM: 1 TB ECC,
+- GPU: 4x A100 80GB,
+- Storage SO: 2x NVMe 1.92TB RAID1,
+- Storage modelos/datos: 8x NVMe 3.84TB+,
+- Red: 2x 100GbE o 1x 200GbE,
+- PSU: redundante N+1/N+N.
 
-- CPU: 2x AMD EPYC o 2x Intel Xeon (>=48 cores totales)
-- RAM: 512 GB ECC
-- GPU: 2x NVIDIA A100 40GB
-- Storage SO: 2x NVMe 1.92TB en RAID1
-- Storage modelos/datasets: 4x NVMe 3.84TB (RAID10 o ZFS mirror+stripe)
-- Red: 2x 25GbE (management + data)
-- PSU: redundante N+1 (1600W+ segun chasis)
-- BMC/IPMI: obligatorio para operacion remota
+### Nodo H100 (produccion recomendada)
 
-### Perfil recomendado (A100 80GB x4)
+- CPU: 2x EPYC/Xeon (>=96 cores totales),
+- RAM: 1-2 TB ECC,
+- GPU: 4x H100 80GB,
+- Storage SO: 2x NVMe 1.92TB RAID1,
+- Storage modelos/datos: 8x NVMe 3.84TB+,
+- Red: 2x 200GbE o InfiniBand 200/400Gbps,
+- PSU: redundante N+N.
 
-- CPU: 2x EPYC/Xeon (>=64 cores totales)
-- RAM: 1 TB ECC
-- GPU: 4x NVIDIA A100 80GB
-- Interconexion GPU: NVLink/NVSwitch (preferible si chasis SXM)
-- Storage SO: 2x NVMe 1.92TB RAID1
-- Storage modelos: 8x NVMe U.2/U.3 3.84TB+ (alto IOPS)
-- Red: 2x 100GbE o 1x 200GbE (segun arquitectura)
-- PSU: redundante N+1/N+N, margen para picos de GPU
+## 6) Costes: CAPEX, OPEX y reserva
 
-### Perfil alto rendimiento (H100 80GB x4)
+Distribucion orientativa de coste:
 
-- CPU: 2x EPYC/Xeon (>=96 cores totales)
-- RAM: 1-2 TB ECC
-- GPU: 4x NVIDIA H100 80GB
-- Interconexion GPU: NVLink/NVSwitch (preferible en SXM)
-- Storage SO: 2x NVMe 1.92TB RAID1
-- Storage modelos: 8x NVMe 3.84TB+ (alto IOPS, baja latencia)
-- Red: 2x 200GbE o InfiniBand 200/400Gbps
-- PSU: redundante N+N con margen para picos de acelerador
+- GPUs: 55-70%,
+- servidor (CPU/RAM/chasis): 20-30%,
+- storage y red: 8-15%,
+- soporte, garantia y puesta en marcha: 5-12%.
 
-## 6) Dimensionamiento rapido por modelo
+Recomendaciones financieras:
 
-- 7B: 1x A100 40GB suele sobrar para inferencia estable.
-- 13B: 1x A100 80GB recomendado (o 2x 40GB segun config).
-- 30B+: 2x A100 80GB o mas, dependiendo de contexto y batch.
-- 70B: 4x A100 80GB (o arquitectura distribuida equivalente).
+- contingencia de proyecto: +10-15% sobre CAPEX,
+- OPEX anual esperado: 12-22% del CAPEX (energia, soporte, operacion).
 
-Nota: el consumo de memoria depende de dtype, longitud de contexto, KV cache, batch y estrategia de paralelismo.
+## 7) Requisitos de plataforma (air-gapped)
 
-## 7) Presupuesto aproximado (CAPEX orientativo, EUR)
+- OS base: RHEL-compatible de ciclo largo,
+- driver NVIDIA validado para CUDA objetivo,
+- NVIDIA Container Toolkit operativo,
+- runtime de contenedores (Podman o Docker) con GPU validada,
+- BIOS/UEFI: Above 4G decoding habilitado,
+- Secure Boot: firma de modulos NVIDIA o deshabilitado en laboratorio.
 
-Rangos orientativos para 2026, sin incluir IVA, soporte premium ni costes de obra CPD.
+## 8) Flujo operativo de despliegue
 
-- Escenario A (1 nodo, 1-2x A100 40GB): **35k-85k EUR**
-- Escenario B (1 nodo, 4x A100 80GB): **150k-280k EUR**
-- Escenario C (2 nodos, 4-8 GPUs A100 por nodo): **320k-1.2M EUR**
-- Perfil H100 (1 nodo, 4x H100 80GB): **320k-550k EUR**
-
-Costes OPEX a considerar aparte: energia, refrigeracion, soporte hardware, repuestos y personal de operacion.
-
-## 8) Throughput estimado (tokens/s)
-
-Valores aproximados para vLLM, dependientes de modelo, longitud de contexto, batch, precision (`fp16`/`bf16`) y mezcla de prompts.
-
-- 1x A100 40GB (modelo 7B): **120-300 tok/s**
-- 2x A100 40GB (7B, mayor concurrencia): **220-550 tok/s**
-- 4x A100 80GB (7B/13B): **700-1800 tok/s**
-- 4x A100 80GB (30B): **250-700 tok/s**
-- 4x H100 80GB (7B/13B): **1400-3500 tok/s**
-- 4x H100 80GB (30B/70B con paralelismo): **450-1500 tok/s**
-
-Para SLO formales, se recomienda benchmark interno con prompts reales y 3 perfiles de carga: interactivo, mixto y throughput.
-
-## 9) Requisitos de plataforma (software/firmware)
-
-- BIOS/UEFI:
-  - Above 4G decoding: habilitado
-  - SR-IOV/IOMMU: segun politica de virtualizacion
-  - Secure Boot: gestionar firma de modulos NVIDIA o deshabilitar en laboratorio
-- OS base: RHEL-compatible de ciclo largo
-- Driver NVIDIA: version certificada para CUDA objetivo
-- NVIDIA Container Toolkit: instalado y validado
-- Runtime: Podman o Docker (con GPU runtime funcional)
-
-## 10) Flujo de despliegue air-gapped
-
-1. Preparar repositorio local de paquetes OS y dependencias Python.
-2. Validar driver y `nvidia-smi` en host.
-3. Validar `nvidia-smi` dentro de contenedor CUDA.
-4. Cargar imagenes OCI de forma offline (`.tar`).
-5. Cargar modelos en almacenamiento local (`models/` o NAS interno).
+1. Preparar repositorio interno de paquetes y artefactos.
+2. Validar `nvidia-smi` en host.
+3. Validar GPU en contenedor CUDA.
+4. Cargar imagenes OCI offline.
+5. Cargar modelos en almacenamiento local.
 6. Arrancar vLLM con perfiles de memoria definidos.
-7. Verificar API (`/v1/models`) y monitorizar VRAM/latencia.
+7. Verificar API y telemetria (latencia, throughput, errores).
 
-## 11) Checklist de aceptacion de hardware
+## 9) Plan de validacion previa a compra
 
-- El host detecta todas las A100 sin errores ECC criticos.
-- `nvidia-smi` y telemetria de potencia/temperatura estables.
-- Contenedor GPU funcional con `nvidia-smi`.
-- vLLM arranca modelo objetivo sin `EngineCore failed to start`.
-- Latencia y throughput cumplen SLO internos.
-- Procedimientos de backup y reemplazo de hardware documentados.
+Validar con datos reales de desarrollo:
 
-## 12) Consideraciones de seguridad (air-gapped)
+- 1 semana de telemetria anonima de patrones de uso IDE,
+- pruebas en 3 perfiles: normal, pico y stress,
+- analisis p95 + coste por token interno,
+- ajuste final de nodos/GPU antes del pedido.
 
-- Segmentacion de red por zonas (ingesta, inferencia, gestion).
-- Inventario y control de medios extraibles.
-- Repositorios internos firmados y versionados.
-- Politica de parches offline con ventanas de mantenimiento.
-- Logs y auditoria centralizados en infraestructura interna.
+Criterio de aprobacion:
 
+- cumple SLO tecnicos definidos,
+- mantiene coste por token interno en rango objetivo,
+- escala a 40 desarrolladores sin rediseno mayor.
