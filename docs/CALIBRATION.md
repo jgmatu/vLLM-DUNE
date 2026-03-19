@@ -1,81 +1,162 @@
-# Technical Calibration Guide for vLLM Startup
+# Guia tecnica de calibracion vLLM (70B, entorno air-gapped)
 
-## Scope
+## 1) Objetivo
 
-This document defines technical constraints and startup recommendations for running vLLM with local models on GPUs with ~12 GB VRAM (e.g., NVIDIA RTX 4070 Ti).
+Definir un procedimiento repetible para calibrar un despliegue vLLM con modelo 70B en entorno air-gapped, controlando:
 
-## Observed Failure Modes
+- carga de pesos (weights),
+- uso de VRAM y RAM,
+- picos de asignacion en arranque y primer trafico,
+- estabilidad de servicio para carga tipo ingenieria (agente IA + IDE).
 
-When loading 7B-class models on 12 GB VRAM, the following errors are expected if memory headroom is insufficient:
+## 2) Alcance y supuestos
 
-- **Weights load OOM**
-  - Typical symptom: `torch.OutOfMemoryError` during model initialization.
-- **KV cache allocation failure**
-  - Typical symptom: `ValueError: No available memory for the cache blocks`.
-  - Associated metric: `Available KV cache memory: < 0 GiB`.
-- **Runtime allocation failure during profiling/compute**
-  - Typical symptom: `RuntimeError: CUBLAS_STATUS_ALLOC_FAILED`.
-  - Often triggered by profile runs or large batched token settings.
+- Modelo de referencia: 70B instruct distribuido.
+- Infraestructura objetivo: multi-GPU / multi-nodo.
+- Runtime: Podman o Docker con soporte NVIDIA.
+- Precision recomendada inicial: `float16` o `bfloat16` segun compatibilidad.
+- Telemetria minima: `nvidia-smi`, logs de vLLM y metricas de latencia API.
 
-## Root Cause
+## 3) Modos de fallo esperables en 70B
 
-7B-class models can consume most of the available VRAM for weights and runtime workspaces. Remaining memory may be insufficient for KV cache blocks and cuBLAS work buffers, especially under default scheduling and compilation paths.
+- OOM durante carga de pesos:
+  - sintoma: `torch.OutOfMemoryError` en init.
+- Fallo de inicializacion de KV cache:
+  - sintoma: `No available memory for the cache blocks`.
+- Fallos en profile/compile o warmup:
+  - sintoma: `CUBLAS_STATUS_ALLOC_FAILED` o errores de compilacion/runtime.
+- Inestabilidad por fragmentacion:
+  - reinicios esporadicos o degradacion de latencia tras varios prompts.
 
-## Operating Constraints (12 GB VRAM)
+## 4) Variables de calibracion (palancas)
 
-- Prefer `float16` for compatibility and lower memory.
-- Keep `max_model_len` low during bootstrap.
-- Limit scheduling pressure:
-  - reduce `max-num-batched-tokens`
-  - reduce `max-num-seqs`
-- Use CPU offload as a stability lever (`--cpu-offload-gb`).
-- If fragmentation/pike allocations occur, prefer eager mode (`--enforce-eager`).
+Orden de impacto practico:
 
-## Recommended Startup Profiles
+1. `max_model_len` (impacta directamente en KV cache).
+2. `gpu_memory_utilization` (reserva efectiva para vLLM).
+3. `cpu_offload_gb` (desplaza presion de VRAM a RAM/PCIe).
+4. `max-num-batched-tokens` (picos de memoria por batch).
+5. `max-num-seqs` (concurrencia interna y presion de scheduler).
+6. `--enforce-eager` (reduce picos de compilacion/cudagraph en hardware sensible).
 
-Profiles are ordered by stability (from normal to restrictive):
+## 5) Procedimiento iterativo de calibracion
 
-1. **balanced-stable**
-   - `dtype=float16`
-   - `max_model_len=1024`
-   - `gpu_memory_utilization=0.82`
-   - `cpu_offload_gb=4`
-   - `--enforce-eager --max-num-batched-tokens 256 --max-num-seqs 4`
+### Fase A: Baseline conservador (arranque garantizado)
 
-2. **aggressive-stable**
-   - `dtype=float16`
-   - `max_model_len=768`
-   - `gpu_memory_utilization=0.88`
-   - `cpu_offload_gb=6`
-   - `--enforce-eager --max-num-batched-tokens 192 --max-num-seqs 3`
+Objetivo: arrancar estable y responder `GET /v1/models`.
 
-3. **safe-eager**
-   - `dtype=float16`
-   - `max_model_len=512`
-   - `gpu_memory_utilization=0.92`
-   - `cpu_offload_gb=8`
-   - `--enforce-eager --max-num-batched-tokens 128 --max-num-seqs 2`
+Valores iniciales sugeridos para 70B:
 
-4. **ultra-min**
-   - `dtype=float16`
-   - `max_model_len=256`
-   - `gpu_memory_utilization=0.97`
-   - `cpu_offload_gb=8`
-   - `--enforce-eager --max-num-batched-tokens 64 --max-num-seqs 1`
+- `dtype=float16`
+- `max_model_len=2048`
+- `gpu_memory_utilization=0.88`
+- `cpu_offload_gb=8`
+- `--enforce-eager --max-num-batched-tokens 128 --max-num-seqs 2`
 
-## Model Selection Guidance
+Si falla arranque:
 
-For production-like stability on 12 GB VRAM:
+- bajar `max_model_len` a `1024`,
+- subir `cpu_offload_gb` (+2 o +4 GB),
+- bajar `max-num-batched-tokens` a `64`.
 
-- Prefer 3B-class models (e.g., `Qwen/Qwen2.5-3B-Instruct`) for predictable startup and lower tuning overhead.
-- Use 7B-class models only if required by quality targets, accepting tighter memory margins and stricter runtime limits.
+### Fase B: Ajuste de pesos y RAM host
 
-## Validation Checklist
+Objetivo: asegurar que la carga de pesos no sature VRAM ni RAM.
 
-After startup:
+Checklist:
 
-1. API health check responds: `GET /v1/models`
-2. GPU process is visible in `nvidia-smi`
-3. VRAM usage remains below hard OOM threshold during first prompt
-4. No repeated `EngineCore failed to start` in runtime logs
+- medir VRAM ocupada tras carga de pesos (sin trafico),
+- medir RAM host consumida por offload y page cache,
+- validar que queda margen de seguridad:
+  - VRAM libre >= 10-15%,
+  - RAM libre >= 15-20%.
+
+Si RAM host queda justa:
+
+- reducir `cpu_offload_gb`,
+- o ampliar RAM por nodo antes de subir concurrencia.
+
+### Fase C: Control de picos
+
+Objetivo: evitar picos en primer token y bajo rafagas.
+
+Prueba en 3 escalones:
+
+1. 1 sesion activa,
+2. concurrencia media (25% del objetivo),
+3. pico controlado (40-50% del objetivo).
+
+En cada escalon registrar:
+
+- p50/p95 tiempo a primer token,
+- p95 latencia total,
+- maximo de VRAM y RAM,
+- errores por minuto.
+
+Regla de tuning:
+
+- si hay picos/errores -> bajar `max-num-batched-tokens` y `max-num-seqs`,
+- si hay estabilidad y margen -> subir de forma gradual (pasos pequenos).
+
+### Fase D: Optimizacion de capacidad
+
+Objetivo: subir throughput sin romper SLO.
+
+Iterar en ciclos cortos:
+
+1. cambiar una sola variable,
+2. ejecutar prueba de 15-30 min,
+3. comparar contra baseline,
+4. conservar solo cambios con mejora neta.
+
+## 6) Perfiles de referencia para 70B
+
+### Perfil `safe-start`
+
+- `max_model_len=1024`
+- `gpu_memory_utilization=0.90`
+- `cpu_offload_gb=10`
+- `--enforce-eager --max-num-batched-tokens 64 --max-num-seqs 1`
+
+Uso: recuperacion o arranque en infra muy ajustada.
+
+### Perfil `balanced-70b`
+
+- `max_model_len=2048`
+- `gpu_memory_utilization=0.88`
+- `cpu_offload_gb=8`
+- `--enforce-eager --max-num-batched-tokens 128 --max-num-seqs 2`
+
+Uso: baseline recomendado para calibracion.
+
+### Perfil `throughput-70b`
+
+- `max_model_len=4096`
+- `gpu_memory_utilization=0.92`
+- `cpu_offload_gb=6`
+- `--max-num-batched-tokens 256 --max-num-seqs 4`
+
+Uso: solo cuando baseline estable y con margen claro de memoria.
+
+## 7) Criterios de aceptacion tecnica
+
+Se considera calibracion valida si:
+
+- arranque estable en frio y en caliente (>=3 ciclos),
+- `GET /v1/models` y prompts de prueba sin errores recurrentes,
+- p95 TTFB dentro del objetivo definido por el equipo,
+- sin OOM ni fallos de KV cache durante prueba de pico controlado,
+- margen de memoria sostenido (sin degradacion progresiva).
+
+## 8) Evidencias minimas a documentar
+
+Por cada iteracion guardar:
+
+- parametros exactos de vLLM,
+- logs de arranque y errores,
+- snapshot de `nvidia-smi`,
+- RAM/Swap host,
+- metrica de latencia y throughput.
+
+Esto permite trazar decisiones y repetir la configuracion ganadora en produccion.
 
