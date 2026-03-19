@@ -126,6 +126,34 @@ Claro, aquí tienes uno:
 Porque ya tienen Twitter.
 ```
 
+Ejemplo de generacion de codigo con vLLM:
+
+```text
+javi@localhost:~/OpenSource/vLLM-DUNE$ python3 src/test_agent.py "serias capaz de hacerme un bucle de programacion en C++?"
+=== Prompt ===
+serias capaz de hacerme un bucle de programacion en C++?
+
+=== Model ===
+Qwen2.5-7B-Instruct
+
+=== Response ===
+¡Claro! ¿Qué tipo de bucle te gustaría crear en C++? Puedes elegir entre `for`, `while` o `do-while`. Por ejemplo, si quieres un bucle que imprima los números del 1 al 5, aquí tienes ejemplos para cada uno de estos tipos de bucles:
+
+### Bucle `for`
+```cpp
+#include <iostream>
+
+int main() {
+    for (int i = 1; i <= 5; ++i) {
+        std::cout << i << " ";
+    }
+    return 0;
+}
+```
+```
+
+
+
 ### 6) Stats GPU extendidas
 
 Script simple (`gpu_stats.sh`):
