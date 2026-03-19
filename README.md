@@ -115,6 +115,17 @@ Claro, aquí tienes uno:
 Zum-ba.
 ```
 
+Otro ejemplo de output real de vLLM (`--stream`):
+
+```text
+=== Stream (anon) ===
+Claro, aquí tienes uno:
+
+¿Por qué los pájaros no usan Facebook?
+
+Porque ya tienen Twitter.
+```
+
 ### 6) Stats GPU extendidas
 
 Script simple (`gpu_stats.sh`):
@@ -138,7 +149,7 @@ Script extendido (`gpu_stats_extended.sh`):
 Ejemplo de salida ASCII (`TABLE_ONLY=1 bash gpu_stats_extended.sh`):
 
 ```text
-Thu Mar 19 14:15:40 2026       
+Thu Mar 19 14:45:01 2026
 +-----------------------------------------------------------------------------------------+
 | NVIDIA-SMI 590.48.01              Driver Version: 590.48.01      CUDA Version: 13.1     |
 +-----------------------------------------+------------------------+----------------------+
@@ -147,7 +158,7 @@ Thu Mar 19 14:15:40 2026
 |                                         |                        |               MIG M. |
 |=========================================+========================+======================|
 |   0  NVIDIA GeForce RTX 4070 Ti     Off |   00000000:2D:00.0  On |                  N/A |
-|  0%   35C    P8             16W /  285W |     298MiB /  12282MiB |      0%      Default |
+|  0%   39C    P8             16W /  285W |   10986MiB /  12282MiB |      6%      Default |
 |                                         |                        |                  N/A |
 +-----------------------------------------+------------------------+----------------------+
 
@@ -159,8 +170,10 @@ Thu Mar 19 14:15:40 2026
 |    0   N/A  N/A            3238      G   /usr/bin/gnome-shell                     82MiB |
 |    0   N/A  N/A            4178    C+G   /usr/bin/ptyxis                          51MiB |
 |    0   N/A  N/A            4273      G   /usr/bin/Xwayland                         4MiB |
-|    0   N/A  N/A            4568      G   /usr/share/cursor/cursor                 96MiB |
+|    0   N/A  N/A            4568      G   /usr/share/cursor/cursor                 90MiB |
+|    0   N/A  N/A           83859      C   VLLM::EngineCore                      10666MiB |
 +-----------------------------------------------------------------------------------------+
+
 ```
 - Verbose:
   - `VERBOSE=1 bash gpu_stats_extended.sh`
