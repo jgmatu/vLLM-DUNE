@@ -12,6 +12,7 @@ MODEL_DIR="${1:-}"
 CONTAINER_CLI="${CONTAINER_CLI:-docker}"
 IMAGE_NAME="${IMAGE_NAME:-vllm-dune:cuda12.4}"
 CONTAINER_NAME="${CONTAINER_NAME:-vllm-dune}"
+MODEL_NAME="${MODEL_NAME:-Qwen2.5-7B-Instruct}"
 VLLM_PORT="${VLLM_PORT:-8000}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.90}"
@@ -57,6 +58,7 @@ RUN_ARGS=(
   -v "${ABS_MODEL_DIR}:/models/local-model:ro"
   "$IMAGE_NAME"
   --model /models/local-model
+  --served-model-name "$MODEL_NAME"
   --host 0.0.0.0
   --port 8000
   --max-model-len "$MAX_MODEL_LEN"
@@ -74,6 +76,7 @@ if [[ "$CONTAINER_CLI" == "podman" ]]; then
     -v "${ABS_MODEL_DIR}:/models/local-model:ro"
     "$IMAGE_NAME"
     --model /models/local-model
+    --served-model-name "$MODEL_NAME"
     --host 0.0.0.0
     --port 8000
     --max-model-len "$MAX_MODEL_LEN"
@@ -88,6 +91,7 @@ else
     -v "${ABS_MODEL_DIR}:/models/local-model:ro"
     "$IMAGE_NAME"
     --model /models/local-model
+    --served-model-name "$MODEL_NAME"
     --host 0.0.0.0
     --port 8000
     --max-model-len "$MAX_MODEL_LEN"

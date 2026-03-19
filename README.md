@@ -3,6 +3,14 @@ Base conceptual de una vLLM air-gapped para entornos RHEL10
 
 ## Uso recomendado (RHEL10 + Podman + NVIDIA)
 
+### Quickstart en 1 comando
+
+`bash bootstrap_and_run.sh`
+
+Opcional (si ya tienes host/modelo preparado):
+
+`SKIP_HOST_SETUP=1 SKIP_DOWNLOAD=1 MODEL_DIR="models/Qwen2.5-7B-Instruct" bash bootstrap_and_run.sh`
+
 ### 1) Preparar host desde cero
 
 Ejecuta:
@@ -32,6 +40,7 @@ Pasos con tu carpeta actual (`models/Qwen2.5-7B-Instruct`):
 
 1. Arrancar contenedor:
    - `bash run_vllm_docker_local.sh "models/Qwen2.5-7B-Instruct"`
+   - Para forzar nombre de modelo servido: `MODEL_NAME="Qwen2.5-7B-Instruct" bash run_vllm_docker_local.sh "models/Qwen2.5-7B-Instruct"`
 
 2. Ver logs de carga del modelo:
    - `docker logs -f vllm-dune`
@@ -50,6 +59,17 @@ Tambien puedes usar script Docker-compatible (Docker o Podman emulando Docker):
 
 - `curl http://localhost:8000/v1/models`
 - `podman logs -f vllm-dune`
+
+### 5) Agente de prueba (prompt tonto)
+
+Script: `src/test_agent.py`
+
+- Prompt por defecto:
+  - `python3 src/test_agent.py`
+- Prompt personalizado:
+  - `python3 src/test_agent.py "cuenta un chiste corto"`
+- Si cambias endpoint/modelo:
+  - `VLLM_BASE_URL="http://localhost:8000" VLLM_MODEL="Qwen2.5-7B-Instruct" python3 src/test_agent.py "hola"`
 
 ---
 
