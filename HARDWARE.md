@@ -116,3 +116,4 @@ Nota: el consumo de memoria depende de dtype, longitud de contexto, KV cache, ba
 - Repositorios internos firmados y versionados.
 - Politica de parches offline con ventanas de mantenimiento.
 - Logs y auditoria centralizados en infraestructura interna.
+
