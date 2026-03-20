@@ -1,4 +1,4 @@
-# Guia tecnica de calibracion vLLM (70B, entorno air-gapped)
+# Guia tecnica de calibracion vLLM (30B-70B, entorno air-gapped)
 
 ## 1) Objetivo
 
@@ -16,13 +16,15 @@ Adicionalmente, la calibracion debe observar comportamientos especificos de:
 
 ## 2) Alcance y supuestos
 
-- Modelo de referencia: 70B instruct distribuido.
-- Infraestructura objetivo: multi-GPU / multi-nodo.
+- **Modelo 30B**: calibracion orientada a **adaptar el servicio al hardware disponible** (VRAM limitada, menos GPUs o nodos). Suele permitir contextos mayores, mas concurrencia o menor offload; es el punto de partida habitual cuando la infra no alcanza comodamente 70B.
+- **Modelo 70B**: calibracion de **referencia de alta calidad** en despliegue distribuido (multi-GPU / multi-nodo), cuando el presupuesto de hardware lo permite.
+- El mismo procedimiento iterativo aplica a ambos tamanos; los valores numericos de perfiles (seccion 6) estan pensados como guia sobre todo para 70B; con 30B se suelen poder relajar `max_model_len`, batch y offload segun margen medido.
+- Infraestructura objetivo: desde **1 nodo / pocas GPUs** (30B) hasta **multi-GPU / multi-nodo** (70B).
 - Runtime: Podman o Docker con soporte NVIDIA.
 - Precision recomendada inicial: `float16` o `bfloat16` segun compatibilidad.
 - Telemetria minima: `nvidia-smi`, logs de vLLM y metricas de latencia API.
 
-## 3) Modos de fallo esperables en 70B
+## 3) Modos de fallo esperables (30B y 70B)
 
 - OOM durante carga de pesos:
   - sintoma: `torch.OutOfMemoryError` en init.
