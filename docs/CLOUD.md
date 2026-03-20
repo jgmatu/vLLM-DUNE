@@ -77,9 +77,8 @@ Ejemplo (uso medio):
 - 22 dias laborables,
 - 500k tokens/dia por dev
 
-<img width="950" height="259" alt="imagen" src="https://github.com/user-attachments/assets/bd04c7dd-fa10-4b31-8546-ceaa3a94c98e" />
-
-
 `tokens_mes ~= 500_000 * 20 * 22 = 220_000_000 tokens/mes`
 
 Este volumen sirve como base para negociar presupuesto y definir alertas de coste.
+
+<img width="950" height="259" alt="imagen" src="https://github.com/user-attachments/assets/bd04c7dd-fa10-4b31-8546-ceaa3a94c98e" />
