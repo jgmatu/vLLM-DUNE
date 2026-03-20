@@ -1,69 +1,56 @@
-# Efficiency note (PoC vs traditional development)
+# Efficiency note — IA, codificacion y diseno (nota tecnica)
 
-Nota complementaria a la PoC vLLM-DUNE: indicadores de repositorio, **comparativa orientativa** codificacion tradicional vs desarrollo asistido por IA (rangos de esfuerzo y calendario), y lectura frente al historial del proyecto.
+Nota tecnica para la PoC vLLM-DUNE: **donde la IA suele ahorrar horas** (generacion y mecanizado de codigo), **donde no sustituye al ingeniero** (diseno y arquitectura), y **riesgo tecnico** si falta criterio de dominio.
 
-## 1) Repository indicators (update periodically)
+## 1) Ahorro orientativo en horas de generacion de codigo
 
-Valores de referencia; no son KPI contractuales. Para refrescarlos:
+La IA asistente actua con mas impacto en tareas donde el trabajo es **producir texto ejecutable o repetible**: plantillas, scripts, Dockerfiles, clientes API minimos, refactors mecanicos, pruebas esqueleto, documentacion de primera pasada. En esas tareas es razonable esperar **ordenes de magnitud del 25-50% menos tiempo de tecleo y busqueda** frente a hacerlo solo a mano (la varianza es alta segun modelo, prompt y familiaridad con el stack).
 
-```bash
-git rev-list --count HEAD
-ls docs/*.md | wc -l
-```
+**Queda fuera de ese “ahorro de codificacion”** (o se diluye mucho) todo lo que exige **entender limites fisicos y de producto**: memoria GPU, concurrencia real, contratos de seguridad, SLAs, compatibilidad de versiones en produccion. Ahi el tiempo se va en **medir, depurar y decidir**, no en generar lineas.
 
-| Indicator | Orientative value (snapshot) |
-|-----------|------------------------------|
-| Total commits (`git rev-list --count HEAD`) | 40 |
-| Technical docs in `docs/` (`*.md`) | 10 (incluye este fichero) |
-| Git history window (first → last commit date) | orden de dias en el calendario del proyecto |
+| Tipo de trabajo | Suele ahorrar horas con IA | Comentario |
+|-----------------|----------------------------|------------|
+| Boilerplate (estructura de proyecto, scripts, YAML/Docker) | Si, en grado alto | Revisar linea a linea; riesgo de flags o APIs desactualizadas. |
+| Implementacion repetitiva (wrappers, parsing, logging basico) | Si | El patron es claro; la IA acelera el mecanizado. |
+| Calibracion en hardware real (OOM, latencia, batch) | Parcial | Puede sugerir hipotesis; **el bucle medir-en-GPU** sigue siendo humano. |
+| Redaccion tecnica (borradores, listas, checklists) | Si, en borrador | El **contenido factual** debe validarlo quien opera el sistema. |
 
-## 2) Documentation surface covered in `docs/`
+Los porcentajes anteriores son **orientativos**, no mediciones de laboratorio; sirven para fijar expectativas con sponsors, no como KPI contractual.
 
-`AGENTES`, `CALIBRATION`, `CLOUD`, `EFFICIENCY`, `EXECUTIVE_SUMMARY`, `HARDWARE`, `OPERATIONS`, `RHEL10`, `SECURITY`, `TEST`.
+## 2) Diseno y arquitectura: no es el foco de la IA
 
-## 3) Comparativa aproximada: codificacion tradicional vs uso de IA
+**Diseno** (que componentes existen, como fallan, que se prioriza cuando hay tension VRAM/latencia/coste) y **arquitectura** (fronteras entre servicios, modelo de amenazas, observabilidad, despliegue) son juicios de ingenieria. La IA puede **proponer** diagramas o textos, pero **no asume responsabilidad** sobre:
 
-**Alcance de comparacion** (entregable equivalente a esta PoC): contenedor vLLM operativo, scripts cliente, calibracion GPU/VRAM documentada, y paquete de documentos tecnicos en `docs/` (hardware, cloud, operaciones, seguridad, resumen ejecutivo, prueba funcional). **Un desarrollador** con stack Linux/containers conocido pero sin experiencia previa profunda en vLLM.
+- Trade-offs correctos para tu entorno (red, GPU, politica de datos).
+- Evolucion del sistema cuando cambia el modelo o la carga.
+- Coherencia entre seguridad, operaciones y negocio.
 
-**Metodologia (honesta)**: no hay medición A/B en este repositorio. Los rangos son **estimaciones de orden de magnitud** coherentes con (a) complejidad observada en la PoC, (b) fricción inevitable (OOM, flags, drivers, red), y (c) literatura gris / encuestas a desarrolladores sobre ahorro de tiempo en tareas de codificacion y documentacion con asistentes (ordenes del 20-55% en subconjuntos de tareas, con alta varianza). Sirven para **planificar expectativas**, no para contratos ni SLAs.
+En la practica: **la IA acelera la codificacion; no reemplaza el diseno**. Confiar en “lo que salio del modelo” como diseno final es una fuente habitual de **deuda tecnica y retrabajo**.
 
-### 3.1 Esfuerzo por fase (horas de trabajo efectivo, aprox.)
+## 3) Riesgo tecnico y necesidad de ingenieria con conocimiento de la materia
 
-| Fase | Codificacion tradicional (rango) | Con IA asistida (rango) | Que cambia con IA |
-|------|----------------------------------|-------------------------|-------------------|
-| Descubrimiento: docs upstream vLLM, Docker, flags criticos | 12-28 h | 6-14 h | Menos búsqueda manual; mas riesgo de **configuraciones plausibles pero incorrectas** → revision obligatoria. |
-| Implementacion: Dockerfile, compose, scripts, cliente API | 10-24 h | 5-14 h | Boilerplate y plantillas mas rapidos; la integracion real (puertos, modelos, env) sigue siendo humana. |
-| Calibracion / estabilidad (OOM, `max_model_len`, offload, eager) | 16-40 h | 10-26 h | Sugerencias aceleran hipotesis; **el bucle medir-en-GPU** no desaparece. |
-| Documentacion tecnica (~10 ficheros, varios dominios) | 28-72 h | 10-28 h | Redaccion y estructura en paralelo; el **contenido debe validarse** contra el sistema real. |
-| Revision, seguridad basica, coherencia entre docs | 8-20 h | 10-24 h | Con IA suele subir el coste de **verificacion** (versiones, flags, no inventar parametros). |
-| **Total orientativo** | **74-184 h** | **41-106 h** | Ahorro bruto tipico **~35-45%** del tiempo de enfoque en este tipo de PoC (rango amplio). |
+Sin un ingeniero (o perfil equivalente) que **domine el dominio** —en esta PoC: inferencia en GPU, vLLM/containers, redes y buenas practicas de seguridad minima— aparecen riesgos como:
 
-Equivalencia en **calendario** (mismo perfil, interrupciones normales): tradicional **~3-6 semanas**; con IA **~1,5-3 semanas** para un resultado comparable en alcance, siempre que exista hardware disponible sin colas largas.
+- **Configuraciones plausibles pero incorrectas** (parametros que compilan o arrancan en un entorno y fallan en otro).
+- **Fallo de diseno**: por ejemplo asumir capacidad o latencia que el hardware no da; o un modelo de despliegue que no escala ni se opera.
+- **Alucinaciones tecnicas**: APIs, flags o versiones inventadas o obsoletas; solo la revision humana con conocimiento de la materia lo detecta de forma fiable.
 
-### 3.2 Comparativa por dimensiones (cualitativa pero operativa)
+**Mitigacion minima**: quien define arquitectura y criterios de aceptacion debe tener **criterio tecnico en la materia**; la IA es herramienta de apoyo en la **fase de implementacion y documentacion**, no sustituto de esa figura.
 
-| Dimension | Tradicional | Con IA |
-|-----------|-------------|--------|
-| **Velocidad inicial** | Mas lenta (mas lectura lineal). | Mas rapida (borradores, esqueletos). |
-| **Calidad del primer borrador** | Suele ser consistente pero incompleto. | Puede ser **muy util o engañoso**; depende del prompt y del modelo. |
-| **Riesgo tecnico** | Errores por desconocimiento del dominio. | Errores por **alucinacion** o APIs desactualizadas; mitigacion: pruebas y difs pequeños. |
-| **Coste de revision** | Concentrado en pares/revision funcional. | Concentrado en **fact-check** (documentacion vs comportamiento real). |
-| **Transferencia al equipo** | Documentacion a menudo llega tarde. | Documentacion puede generarse **en paralelo** al codigo (como en este repo). |
-| **Curva de aprendizaje vLLM/GPU** | Empinada, mucha lectura. | Empinada en **validacion**; la teoria llega filtrada por el asistente. |
+## 4) Sintesis: foco de la IA vs rol del ingeniero
 
-### 3.3 Lectura frente a los indicadores del repositorio
+| Aspecto | IA (asistente de codigo / texto) | Ingeniero con conocimiento de la materia |
+|---------|----------------------------------|------------------------------------------|
+| **Objetivo principal** | Reducir horas de **generacion y mecanizado** de codigo y borradores. | **Diseno, arquitectura, validacion** y decisiones bajo incertidumbre. |
+| **Salida confiable sin revision** | No; siempre revisar lo critico. | Es la referencia para lo que es critico. |
+| **Riesgo si falta** | Tiempo perdido en correcciones. | **Fallo de diseno**, incidentes, retrabajo mayor. |
 
-- Un volumen similar de **commits** y de **superficie documental** en flujo tradicional suele estirar el **calendario** y los **handoffs** entre roles (infra, seguridad, operacion).
-- Con IA, la **densidad de commits** refleja ciclos cortos de ajuste (scripts, contenedores, calibracion) y la documentacion **acompaña** el codigo, lo que reduce silos de conocimiento.
-- El valor agregado no es solo LOC: es alinear PoC tecnica con hardware, cloud, operacion, seguridad y resumen ejecutivo **en el mismo ciclo de vida**; la IA acelera sobre todo las tareas **texto + estructura + variantes**, no la disponibilidad de GPU ni la latencia real del servicio.
+## 5) Limitaciones
 
-## 4) Limitations
-
-- Las cifras de la seccion 3 son **aproximadas**; dependen de experiencia previa, calidad del modelo de IA, y acceso a GPU.
-- El numero de commits depende del estilo de trabajo (commits pequenos vs grandes).
+- Los rangos de ahorro de tiempo son **cualitativos** y dependen del equipo, del modelo de IA y del acceso a hardware.
 - La documentacion no sustituye pruebas formales ni auditoria.
-- Este documento es un **anexo cualitativo** a la PoC.
+- Este documento es **anexo a la PoC**, no especificacion de producto.
 
-## 5) Related
+## 6) Related
 
 - Prueba funcional de generacion de codigo: `docs/TEST.md`.

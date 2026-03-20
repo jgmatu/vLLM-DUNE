@@ -49,3 +49,4 @@ int main() {
 - El modelo genera una respuesta coherente de codigo fuente.
 - El flujo prompt -> inferencia -> salida funciona sin errores de API.
 
+Nota sobre ahorro de horas en codificacion con IA, riesgo tecnico y diseno/arquitectura: ver `docs/EFFICIENCY.md`.
