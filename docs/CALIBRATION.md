@@ -2,12 +2,17 @@
 
 ## 1) Objetivo
 
-Definir un procedimiento repetible para calibrar un despliegue vLLM con modelo 70B en entorno air-gapped, controlando:
+Definir un procedimiento repetible para calibrar un despliegue vLLM en entorno air-gapped, con objetivo ajustable entre modelos 30B y 70B, controlando:
 
 - carga de pesos (weights),
 - uso de VRAM y RAM,
 - picos de asignacion en arranque y primer trafico,
 - estabilidad de servicio para carga tipo ingenieria (agente IA + IDE).
+
+Adicionalmente, la calibracion debe observar comportamientos especificos de:
+
+- prompts (longitud, complejidad, contexto acumulado),
+- agentes (patrones multi-turn, uso de herramientas y variabilidad de latencia).
 
 ## 2) Alcance y supuestos
 
